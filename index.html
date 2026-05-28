@@ -370,7 +370,7 @@ textarea:focus { border-color:var(--gold); }
 </div>
 </div>
 <script>
-window.addEventListener('load', function(){ startApp(); });
+document.addEventListener('DOMContentLoaded', function(){ startApp(); });
 function closeWelcome(){
   var el=document.getElementById('welcomeOverlay');
   if(el){ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){el.style.display='none';},300); }
@@ -465,24 +465,42 @@ const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 let currentChar='moses', messages=[], isLoading=false;
 
 function startApp(){
-  const key=document.getElementById('apiKeyInput').value.trim();
-  if(!key.startsWith('sk-ant-')){alert('올바른 API 키 형식이 아닙니다.\nsk-ant- 로 시작하는 키를 입력해주세요.');return;}
-  apiKey=key;
-  document.getElementById('apiSetup').style.display='none';
-  document.getElementById('mainApp').style.display='block';
-  buildCharBars(); selectChar('moses');
+  var s=document.getElementById('apiSetup');
+  var m=document.getElementById('mainApp');
+  if(s) s.style.display='none';
+  if(m) m.style.display='block';
+  buildCharBars(); selectChar('moses'); initUsage();
 }
+
 function resetApiKey(){
   apiKey=''; messages=[];
   document.getElementById('apiSetup').style.display='block';
   document.getElementById('mainApp').style.display='none';
-  document.getElementById('apiKeyInput').value='';
-}
-document.getElementById('apiKeyInput').addEventListener('keydown',function(e){if(e.key==='Enter')startApp();});
+  
 
 function buildCharBars(){
-  document.getElementById('otBar').innerHTML=OT_ORDER.map(id=>'<button class="char-btn" onclick="selectChar(\''+id+'\')" data-char="'+id+'">'+CHARS[id].icon+' '+CHARS[id].name+'</button>').join('');
-  document.getElementById('ntBar').innerHTML=NT_ORDER.map(id=>'<button class="char-btn" onclick="selectChar(\''+id+'\')" data-char="'+id+'">'+CHARS[id].icon+' '+CHARS[id].name+'</button>').join('');
+  var otBar=document.getElementById('otBar');
+  var ntBar=document.getElementById('ntBar');
+  if(otBar){
+    otBar.innerHTML='';
+    OT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='char-btn'; btn.dataset.char=id;
+      btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){selectChar(id);});
+      otBar.appendChild(btn);
+    });
+  }
+  if(ntBar){
+    ntBar.innerHTML='';
+    NT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='char-btn'; btn.dataset.char=id;
+      btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){selectChar(id);});
+      ntBar.appendChild(btn);
+    });
+  }
 }
 function initUsage(){
   var u=parseInt(localStorage.getItem('bca_usage_'+getMonthKey())||'0');
@@ -761,6 +779,7 @@ async function sendMsg(){
     document.getElementById('chatArea').scrollTop=99999; messages.pop();
   }
   isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
+}
 }
 </script>
 </body>
