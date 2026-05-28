@@ -468,7 +468,7 @@ function startApp(){
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  buildCharBars(); selectChar('moses'); initUsage();
+  setTimeout(function(){ buildCharBars(); selectChar('moses'); initUsage(); }, 0);
 }
 
 function resetApiKey(){
