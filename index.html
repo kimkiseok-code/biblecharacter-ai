@@ -466,11 +466,7 @@ const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 let currentChar='moses', messages=[], isLoading=false;
 
 function startApp(){
-  var s=document.getElementById('apiSetup');
-  var m=document.getElementById('mainApp');
-  if(s) s.style.display='none';
-  if(m) m.style.display='block';
-  window.setTimeout(buildCharBars, 100); window.setTimeout(function(){selectChar('moses'); initUsage();}, 150);
+  buildCharBars(); selectChar('moses'); initUsage();
 }
 
 function resetApiKey(){
