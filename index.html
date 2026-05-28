@@ -370,7 +370,6 @@ textarea:focus { border-color:var(--gold); }
 </div>
 </div>
 <script>
-document.addEventListener('DOMContentLoaded', function(){ startApp(); });
 function closeWelcome(){
   var el=document.getElementById('welcomeOverlay');
   if(el){ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){el.style.display='none';},300); }
@@ -781,6 +780,7 @@ async function sendMsg(){
   isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
 }
+document.addEventListener('DOMContentLoaded', function(){ startApp(); });
 </script>
 </body>
 </html>
