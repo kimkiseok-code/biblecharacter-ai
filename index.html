@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BibleCharacter.AI — 성경 인물 AI 멘토링</title>
 <style>
+
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -286,34 +287,13 @@ textarea:focus { border-color:var(--gold); }
   white-space:nowrap;
 }
 .toast.show { opacity:1; }
+
 </style>
 </head>
 <body>
 <div class="container">
 
-<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
-  <div class="drawer">
-    <div class="drawer-header">
-      <div class="drawer-title">📖 나의 신앙 기록</div>
-      <button class="drawer-close" onclick="closeDrawerBtn()">✕</button>
-    </div>
-    <div class="drawer-list" id="drawerList"></div>
-  </div>
-</div>
-
-<div class="detail-modal" id="detailModal">
-  <div class="detail-box">
-    <div class="detail-header">
-      <div class="detail-title" id="detailTitle"></div>
-      <button class="detail-close" onclick="closeDetail()">✕</button>
-    </div>
-    <div class="detail-body" id="detailBody"></div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<div id="limitModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.85);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;">
+<div id="limitModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.85);align-items:center;justify-content:center;z-index:1000;padding:20px;">
   <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px;max-width:380px;width:100%;text-align:center;">
     <div style="font-size:32px;margin-bottom:12px;">🙏</div>
     <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:12px;">이번 달 무료 횟수를 모두 사용했습니다</div>
@@ -338,6 +318,28 @@ textarea:focus { border-color:var(--gold); }
   </div>
 </div>
 
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+  <div class="drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">📖 나의 신앙 기록</div>
+      <button class="drawer-close" onclick="closeDrawerBtn()">✕</button>
+    </div>
+    <div class="drawer-list" id="drawerList"></div>
+  </div>
+</div>
+
+<div class="detail-modal" id="detailModal">
+  <div class="detail-box">
+    <div class="detail-header">
+      <div class="detail-title" id="detailTitle"></div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <div id="mainApp" style="display:block;">
 <div class="app">
   <div class="header">
@@ -346,7 +348,6 @@ textarea:focus { border-color:var(--gold); }
       <div class="api-status"><div class="status-dot"></div>API 연결됨</div>
       <div id="usageCount" style="font-size:10px;color:#4CAF50;"></div>
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
-      
     </div>
   </div>
   <div class="char-section">
@@ -356,18 +357,19 @@ textarea:focus { border-color:var(--gold); }
     <div class="character-bar" id="ntBar"></div>
   </div>
   <div class="chat-area" id="chatArea"></div>
-  <div class="quick-btns" id="quickBtns"></div>
   <div class="save-bar" id="saveBar" style="display:none;">
     <span class="save-bar-label">💬 대화가 끝났나요? 기록으로 남겨보세요</span>
     <button class="btn-nosave" onclick="hideSaveBar()">닫기</button>
     <button class="btn-save" onclick="saveRecord()">💾 저장하기</button>
   </div>
+  <div class="quick-btns" id="quickBtns"></div>
   <div class="input-area">
     <textarea id="msgInput" placeholder="오늘 마음의 짐을 나눠보세요..." onkeydown="handleKey(event)"></textarea>
     <button class="send-btn" id="sendBtn" onclick="sendMsg()">➤</button>
   </div>
 </div>
 </div>
+
 </div>
 <script>
 function closeWelcome(){
@@ -468,7 +470,7 @@ function startApp(){
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  setTimeout(function(){ buildCharBars(); selectChar('moses'); initUsage(); }, 0);
+  buildCharBars(); selectChar('moses'); initUsage();
 }
 
 function resetApiKey(){
@@ -780,7 +782,9 @@ async function sendMsg(){
   isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
 }
-document.addEventListener('DOMContentLoaded', function(){ startApp(); });
+// 즉시 실행
+// 앱 시작
+startApp();
 </script>
 </body>
 </html>
