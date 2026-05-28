@@ -4,6 +4,11 @@ export default async function handler(req, res) {
   }
   try {
     const { system, messages } = req.body;
+    
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: 'API 키가 설정되지 않았습니다' });
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -18,10 +23,20 @@ export default async function handler(req, res) {
         messages: messages
       })
     });
+
     const data = await response.json();
-    if (!response.ok) return res.status(response.status).json(data);
+    if (!response.ok) {
+      return res.status(response.status).json({ 
+        error: data.error?.message || '알 수 없는 오류',
+        detail: data 
+      });
+    }
     return res.status(200).json(data);
+
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ 
+      error: error.message,
+      stack: error.stack 
+    });
   }
 }
