@@ -470,7 +470,7 @@ function startApp(){
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  buildCharBars(); selectChar('moses'); initUsage();
+  window.setTimeout(buildCharBars, 100); window.setTimeout(function(){selectChar('moses'); initUsage();}, 150);
 }
 
 function resetApiKey(){
