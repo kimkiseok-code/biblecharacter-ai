@@ -466,15 +466,14 @@ const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 let currentChar='moses', messages=[], isLoading=false;
 
 function startApp(){
+  var s=document.getElementById('apiSetup');
+  var m=document.getElementById('mainApp');
+  if(s) s.style.display='none';
+  if(m) m.style.display='block';
   buildCharBars(); selectChar('moses'); initUsage();
 }
 
-function resetApiKey(){
-  apiKey=''; messages=[];
-  document.getElementById('apiSetup').style.display='block';
-  document.getElementById('mainApp').style.display='none';
-}
-  
+function resetApiKey(){ messages=[]; }
 
 function buildCharBars(){
   var otBar=document.getElementById('otBar');
@@ -778,8 +777,6 @@ async function sendMsg(){
   }
   isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
-}
-// 즉시 실행
 // 앱 시작
 startApp();
 </script>
