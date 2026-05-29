@@ -29,9 +29,13 @@ body { background:#1A1610; display:flex; align-items:center; justify-content:cen
 
 #mainApp { display:block; }
 .app { background:var(--parchment); border-radius:16px; overflow:hidden; border:1px solid rgba(184,149,42,.3); box-shadow:0 20px 60px rgba(0,0,0,.5); display:flex; flex-direction:column; height:90vh; max-height:760px; }
-.header { background:var(--ink); padding:14px 22px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--gold); flex-shrink:0; }
+.header { background:var(--ink); padding:14px 22px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--gold); flex-shrink:0; transition:padding .3s ease; }
 .logo { font-family:'Pretendard',sans-serif; color:var(--gold-light); font-size:15px; font-weight:700; letter-spacing:-0.02em; }
-.logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; }
+.logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; transition:all .3s ease; }
+.logo-mini { display:none; font-size:11px; color:var(--ink-soft); font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.04em; }
+.chat-screen .header { padding:7px 22px 7px; }
+.chat-screen .logo span { display:none; }
+.chat-screen .logo-mini { display:inline; }
 .header-right { display:flex; align-items:center; gap:10px; }
 .api-status { font-size:10px; color:#4CAF50; display:flex; align-items:center; gap:5px; }
 .status-dot { width:6px; height:6px; background:#4CAF50; border-radius:50%; }
@@ -538,7 +542,7 @@ textarea:focus { border-color:var(--gold); }
 <div id="mainApp" style="display:block;">
 <div class="app">
   <div class="header">
-    <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span></div>
+    <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span><span class="logo-mini" id="logoMini"> · </span></div>
     <div class="header-right">
       <div class="api-status"><div class="status-dot"></div>API 연결됨</div>
       <div id="usageCount" style="font-size:10px;color:#4CAF50;"></div>
@@ -685,7 +689,7 @@ function startApp(){
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  buildCharBars(); initUsage();
+  buildCharBars(); selectChar('moses'); initUsage();
 }
 
 function resetApiKey(){ messages=[]; }
@@ -733,6 +737,8 @@ function selectChar(id){
   var qb=document.getElementById('quickBtns'); if(qb) qb.classList.remove('open');
   var tb=document.getElementById('quickToggleBtn'); if(tb) tb.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
   document.querySelectorAll('.char-btn').forEach(b=>b.classList.toggle('active',b.dataset.char===id));
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · '+(CHARS[id]?CHARS[id].icon+' '+CHARS[id].name:'');
   renderGreeting(); renderQuickBtns();
 }
 function renderGreeting(){
@@ -833,6 +839,8 @@ function enterChatScreen(){
   document.querySelector('.app').classList.add('chat-screen');
   var btn=document.getElementById('changeCharBtn');
   if(btn) btn.style.display='block';
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · '+(CHARS[currentChar]?CHARS[currentChar].icon+' '+CHARS[currentChar].name:'');
 }
 function goSelectScreen(){
   document.querySelector('.app').classList.remove('chat-screen');
@@ -840,6 +848,8 @@ function goSelectScreen(){
   exitAnswerMode();
   var btn=document.getElementById('changeCharBtn');
   if(btn) btn.style.display='none';
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · ';
   messages=[];
   hideSaveBar();
 }
