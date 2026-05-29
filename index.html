@@ -389,6 +389,90 @@ textarea:focus { border-color:var(--gold); }
   flex-shrink:0;
 }
 .quick-btns.open { display:flex; }
+
+/* 인물 선택 화면 */
+.select-screen {
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  overflow-y:auto;
+  padding:24px 20px;
+  background:var(--parchment);
+}
+.select-title {
+  font-family:'Pretendard',sans-serif;
+  font-size:17px;
+  font-weight:700;
+  color:var(--ink);
+  line-height:1.6;
+  margin-bottom:4px;
+  text-align:center;
+}
+.select-sub {
+  font-family:'Pretendard',sans-serif;
+  font-size:13px;
+  color:var(--ink-soft);
+  text-align:center;
+  margin-bottom:24px;
+}
+.select-divider {
+  width:40px; height:2px;
+  background:var(--gold);
+  margin:0 auto 24px;
+  border-radius:2px;
+}
+.select-section-label {
+  font-size:11px;
+  color:var(--ink-soft);
+  letter-spacing:.08em;
+  font-weight:600;
+  margin-bottom:10px;
+  font-family:'Pretendard',sans-serif;
+}
+.select-btn-grid {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:20px;
+}
+.select-char-btn {
+  background:white;
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:7px 14px;
+  font-family:'Pretendard',sans-serif;
+  font-size:12.5px;
+  font-weight:500;
+  color:var(--ink-mid);
+  cursor:pointer;
+  transition:all .18s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.select-char-btn:hover {
+  background:var(--gold);
+  border-color:var(--gold);
+  color:var(--ink);
+}
+
+/* 대화 화면 - 상단 인물 메뉴 숨김 */
+.chat-screen .char-section { display:none !important; }
+.chat-screen .select-screen { display:none !important; }
+
+/* 인물 변경 버튼 */
+.change-char-btn {
+  background:transparent;
+  border:.5px solid rgba(184,149,42,.3);
+  border-radius:6px;
+  padding:4px 10px;
+  color:var(--ink-soft);
+  font-size:11px;
+  cursor:pointer;
+  font-family:'Pretendard',sans-serif;
+  transition:all .15s;
+}
+.change-char-btn:hover { border-color:var(--gold); color:var(--gold); }
 </style>
 </head>
 <body>
@@ -446,10 +530,19 @@ textarea:focus { border-color:var(--gold); }
   <div class="header">
     <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span></div>
     <div class="header-right">
-      
+      <div class="api-status"><div class="status-dot"></div>API 연결됨</div>
       <div id="usageCount" style="font-size:10px;color:#4CAF50;"></div>
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
     </div>
+  </div>
+  <div class="select-screen" id="selectScreen">
+    <div class="select-title">오늘 누구의 이야기가<br>당신 마음에 닿나요?</div>
+    <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
+    <div class="select-divider"></div>
+    <div class="select-section-label">📜 구약 (14인)</div>
+    <div class="select-btn-grid" id="selectOtBar"></div>
+    <div class="select-section-label">✝️ 신약 (6인)</div>
+    <div class="select-btn-grid" id="selectNtBar"></div>
   </div>
   <div class="char-section">
     <div class="section-label">📜 구약 (14인)</div>
@@ -698,6 +791,48 @@ var BOOK_MAP={
   '요':'JHN','행':'ACT','롬':'ROM','갈':'GAL','엡':'EPH','빌':'PHP','골':'COL',
   '딛':'TIT','몬':'PHM','히':'HEB','약':'JAS','유':'JUD','계':'REV'
 };
+function buildSelectScreen(){
+  var otBar=document.getElementById('selectOtBar');
+  var ntBar=document.getElementById('selectNtBar');
+  if(otBar){
+    otBar.innerHTML='';
+    OT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='select-char-btn';
+      btn.innerHTML=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){ selectCharFromScreen(id); });
+      otBar.appendChild(btn);
+    });
+  }
+  if(ntBar){
+    ntBar.innerHTML='';
+    NT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='select-char-btn';
+      btn.innerHTML=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){ selectCharFromScreen(id); });
+      ntBar.appendChild(btn);
+    });
+  }
+}
+function selectCharFromScreen(id){
+  selectChar(id);
+  enterChatScreen();
+}
+function enterChatScreen(){
+  document.querySelector('.app').classList.add('chat-screen');
+  var btn=document.getElementById('changeCharBtn');
+  if(btn) btn.style.display='block';
+}
+function goSelectScreen(){
+  document.querySelector('.app').classList.remove('chat-screen');
+  document.querySelector('.app').classList.remove('answer-mode');
+  exitAnswerMode();
+  var btn=document.getElementById('changeCharBtn');
+  if(btn) btn.style.display='none';
+  messages=[];
+  hideSaveBar();
+}
 function toggleQuick(){
   var qb=document.getElementById('quickBtns');
   var icon=document.getElementById('quickToggleIcon');
@@ -720,9 +855,7 @@ function exitAnswerMode(){
 }
 function goHome(){
   exitAnswerMode();
-  messages=[];
-  hideSaveBar();
-  selectChar(currentChar);
+  goSelectScreen();
 }
 function askAgain(){
   exitAnswerMode();
