@@ -471,13 +471,17 @@ textarea:focus { border-color:var(--gold); }
 
 /* 대화 화면 - 상단 인물 메뉴 숨김 */
 .chat-screen .char-section { display:none !important; }
-.chat-screen .select-screen { display:none !important; }
+.chat-screen .select-title-area { display:none !important; }
+.select-screen { display:none !important; }
 .app:not(.chat-screen) .header { display:none !important; }
-.app:not(.chat-screen) .char-section { display:none !important; }
 .app:not(.chat-screen) .chat-area { display:none !important; }
 .app:not(.chat-screen) .input-row { display:none !important; }
 .app:not(.chat-screen) .quick-section { display:none !important; }
 .app:not(.chat-screen) .save-bar { display:none !important; }
+.select-title-area {
+  display:flex; flex-direction:column; align-items:center;
+  padding:28px 20px 16px; background:var(--parchment); flex-shrink:0;
+}
 
 /* 인물 변경 버튼 */
 .change-char-btn {
@@ -554,13 +558,11 @@ textarea:focus { border-color:var(--gold); }
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
     </div>
   </div>
-  <div class="select-screen" id="selectScreen">
+  <div class="select-title-area" id="selectTitleArea">
     <div class="select-logo">✦ BibleCharacter.AI</div>
     <div class="select-divider"></div>
     <div class="select-title">하나님은 성경 속 인물들을 통해<br>오늘도 말씀하십니다</div>
     <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
-    <div class="select-btn-grid" id="selectOtBar"></div>
-    <div class="select-btn-grid" id="selectNtBar"></div>
   </div>
   <div class="char-section">
     <div class="section-label">📜 구약 (14인)</div>
@@ -694,7 +696,7 @@ function startApp(){
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  buildCharBars(); buildSelectScreen(); initUsage();
+  buildCharBars(); initUsage();
 }
 
 function resetApiKey(){ messages=[]; }
