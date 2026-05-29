@@ -28,7 +28,7 @@ body { background:#1A1610; display:flex; align-items:center; justify-content:cen
 
 
 #mainApp { display:block; }
-.app { background:var(--parchment); border-radius:16px; overflow:hidden; border:1px solid rgba(184,149,42,.3); box-shadow:0 20px 60px rgba(0,0,0,.5); display:flex; flex-direction:column; height:100dvh; max-height:760px; }
+.app { background:var(--parchment); border-radius:16px; overflow:hidden; border:1px solid rgba(184,149,42,.3); box-shadow:0 20px 60px rgba(0,0,0,.5); display:flex; flex-direction:column; height:90vh; max-height:760px; }
 .header { background:var(--ink); padding:14px 22px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--gold); flex-shrink:0; }
 .logo { font-family:'Pretendard',sans-serif; color:var(--gold-light); font-size:15px; font-weight:700; letter-spacing:-0.02em; }
 .logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; }
@@ -288,6 +288,74 @@ textarea:focus { border-color:var(--gold); }
 }
 .toast.show { opacity:1; }
 
+
+/* 답변 모드 */
+.answer-mode .char-section { display:none !important; }
+.answer-mode .save-bar { display:none !important; }
+.answer-mode .quick-btns { display:none !important; }
+.answer-mode .chat-area { 
+  flex:1; 
+  padding:20px 18px;
+}
+
+/* 답변 모드 하단 버튼 바 */
+.answer-actions {
+  display:none;
+  padding:12px 16px 16px;
+  background:white;
+  border-top:.5px solid var(--border);
+  flex-shrink:0;
+  gap:8px;
+  flex-direction:column;
+}
+.answer-mode .answer-actions { display:flex; }
+.answer-mode .input-area { display:none; }
+
+.btn-home {
+  background:var(--ink);
+  border:none; border-radius:12px;
+  padding:13px;
+  font-family:'Pretendard',sans-serif;
+  font-size:14px; font-weight:600;
+  color:var(--gold-light);
+  cursor:pointer;
+  transition:background .2s;
+  width:100%; text-align:center;
+}
+.btn-home:hover { background:#3A3020; }
+
+.btn-row {
+  display:flex; gap:8px;
+}
+.btn-again {
+  flex:1;
+  background:var(--gold-pale);
+  border:1px solid rgba(184,149,42,.4);
+  border-radius:12px;
+  padding:11px;
+  font-family:'Pretendard',sans-serif;
+  font-size:13px; font-weight:500;
+  color:var(--ink-mid);
+  cursor:pointer;
+  transition:all .15s;
+  text-align:center;
+}
+.btn-again:hover { background:var(--gold); color:var(--ink); }
+
+.btn-save2 {
+  flex:1;
+  background:var(--gold);
+  border:none;
+  border-radius:12px;
+  padding:11px;
+  font-family:'Pretendard',sans-serif;
+  font-size:13px; font-weight:600;
+  color:var(--ink);
+  cursor:pointer;
+  transition:background .15s;
+  text-align:center;
+}
+.btn-save2:hover { background:#9A7A1E; }
 </style>
 </head>
 <body>
@@ -345,7 +413,7 @@ textarea:focus { border-color:var(--gold); }
   <div class="header">
     <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span></div>
     <div class="header-right">
-      
+      <div class="api-status"><div class="status-dot"></div>API 연결됨</div>
       <div id="usageCount" style="font-size:10px;color:#4CAF50;"></div>
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
     </div>
@@ -363,6 +431,13 @@ textarea:focus { border-color:var(--gold); }
     <button class="btn-save" onclick="saveRecord()">💾 저장하기</button>
   </div>
   <div class="quick-btns" id="quickBtns"></div>
+  <div class="answer-actions" id="answerActions">
+    <div class="btn-row">
+      <button class="btn-again" onclick="askAgain()">🔄 다시 묻기</button>
+      <button class="btn-save2" onclick="saveRecord()">💾 저장하기</button>
+    </div>
+    <button class="btn-home" onclick="goHome()">🏠 처음으로</button>
+  </div>
   <div class="input-area">
     <textarea id="msgInput" placeholder="오늘 마음의 짐을 나눠보세요..." onkeydown="handleKey(event)"></textarea>
     <button class="send-btn" id="sendBtn" onclick="sendMsg()">➤</button>
@@ -573,6 +648,22 @@ var BOOK_MAP={
   '요':'JHN','행':'ACT','롬':'ROM','갈':'GAL','엡':'EPH','빌':'PHP','골':'COL',
   '딛':'TIT','몬':'PHM','히':'HEB','약':'JAS','유':'JUD','계':'REV'
 };
+function enterAnswerMode(){
+  document.querySelector('.app').classList.add('answer-mode');
+}
+function exitAnswerMode(){
+  document.querySelector('.app').classList.remove('answer-mode');
+}
+function goHome(){
+  exitAnswerMode();
+  messages=[];
+  hideSaveBar();
+  selectChar(currentChar);
+}
+function askAgain(){
+  exitAnswerMode();
+  document.getElementById('msgInput').focus();
+}
 function getMonthKey(){
   var d=new Date();
   return d.getFullYear()+'_'+(d.getMonth()+1);
@@ -609,9 +700,7 @@ function showToast(msg){
   setTimeout(function(){t.classList.remove('show');},2500);
 }
 
-function showSaveBar(){
-  if(messages.length>=2) document.getElementById('saveBar').style.display='flex';
-}
+function showSaveBar(){}
 function hideSaveBar(){
   document.getElementById('saveBar').style.display='none';
 }
@@ -762,7 +851,7 @@ async function sendMsg(){
     const reply=data.content?.[0]?.text||'응답을 받지 못했습니다.';
     messages.push({role:'assistant',content:reply});
     removeTyping(); addAiMsg(formatReply(reply));
-    showSaveBar();
+    enterAnswerMode();
     // 사용량 증가
     var uk='bca_usage_'+getMonthKey();
     var u=parseInt(localStorage.getItem(uk)||'0')+1;
