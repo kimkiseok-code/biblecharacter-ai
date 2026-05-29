@@ -473,6 +473,10 @@ textarea:focus { border-color:var(--gold); }
 .chat-screen .char-section { display:none !important; }
 .chat-screen .select-screen { display:none !important; }
 .app:not(.chat-screen) .header { display:none !important; }
+.app:not(.chat-screen) .chat-area { display:none !important; }
+.app:not(.chat-screen) .input-row { display:none !important; }
+.app:not(.chat-screen) .quick-section { display:none !important; }
+.app:not(.chat-screen) .save-bar { display:none !important; }
 
 /* 인물 변경 버튼 */
 .change-char-btn {
@@ -682,14 +686,14 @@ const CHARS = {
 const OT_ORDER=['noah','abraham','sarah','joseph','moses','joshua','gideon','hannah','david','ruth','elijah','job','daniel','esther'];
 const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 
-let currentChar='moses', messages=[], isLoading=false;
+let currentChar='', messages=[], isLoading=false;
 
 function startApp(){
   var s=document.getElementById('apiSetup');
   var m=document.getElementById('mainApp');
   if(s) s.style.display='none';
   if(m) m.style.display='block';
-  buildCharBars(); selectChar('moses'); initUsage();
+  buildCharBars(); buildSelectScreen(); initUsage();
 }
 
 function resetApiKey(){ messages=[]; }
