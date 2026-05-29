@@ -293,6 +293,7 @@ textarea:focus { border-color:var(--gold); }
 .answer-mode .char-section { display:none !important; }
 .answer-mode .save-bar { display:none !important; }
 .answer-mode .quick-btns { display:none !important; }
+.answer-mode .quick-toggle { display:none !important; }
 .answer-mode .chat-area { 
   flex:1; 
   padding:20px 18px;
@@ -356,6 +357,38 @@ textarea:focus { border-color:var(--gold); }
   text-align:center;
 }
 .btn-save2:hover { background:#9A7A1E; }
+
+/* 예시 보기 토글 */
+.quick-toggle {
+  padding:6px 16px 0;
+  background:white;
+  flex-shrink:0;
+}
+.btn-quick-toggle {
+  background:transparent;
+  border:.5px solid var(--border);
+  border-radius:20px;
+  padding:5px 14px;
+  font-family:'Pretendard',sans-serif;
+  font-size:12px;
+  color:var(--ink-soft);
+  cursor:pointer;
+  transition:all .2s;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.btn-quick-toggle:hover { border-color:var(--gold); color:var(--gold); }
+.quick-btns {
+  padding:8px 16px;
+  display:none;
+  gap:6px;
+  flex-wrap:wrap;
+  background:white;
+  border-top:none;
+  flex-shrink:0;
+}
+.quick-btns.open { display:flex; }
 </style>
 </head>
 <body>
@@ -413,7 +446,7 @@ textarea:focus { border-color:var(--gold); }
   <div class="header">
     <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span></div>
     <div class="header-right">
-      
+      <div class="api-status"><div class="status-dot"></div>API 연결됨</div>
       <div id="usageCount" style="font-size:10px;color:#4CAF50;"></div>
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
     </div>
@@ -429,6 +462,11 @@ textarea:focus { border-color:var(--gold); }
     <span class="save-bar-label">💬 대화가 끝났나요? 기록으로 남겨보세요</span>
     <button class="btn-nosave" onclick="hideSaveBar()">닫기</button>
     <button class="btn-save" onclick="saveRecord()">💾 저장하기</button>
+  </div>
+  <div class="quick-toggle" id="quickToggleWrap">
+    <button class="btn-quick-toggle" onclick="toggleQuick()" id="quickToggleBtn">
+      <span id="quickToggleIcon">▾</span> 예시 보기
+    </button>
   </div>
   <div class="quick-btns" id="quickBtns"></div>
   <div class="answer-actions" id="answerActions">
@@ -580,6 +618,8 @@ function initUsage(){
 }
 function selectChar(id){
   currentChar=id; messages=[]; hideSaveBar();
+  var qb=document.getElementById('quickBtns'); if(qb) qb.classList.remove('open');
+  var tb=document.getElementById('quickToggleBtn'); if(tb) tb.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
   document.querySelectorAll('.char-btn').forEach(b=>b.classList.toggle('active',b.dataset.char===id));
   renderGreeting(); renderQuickBtns();
 }
@@ -648,6 +688,20 @@ var BOOK_MAP={
   '요':'JHN','행':'ACT','롬':'ROM','갈':'GAL','엡':'EPH','빌':'PHP','골':'COL',
   '딛':'TIT','몬':'PHM','히':'HEB','약':'JAS','유':'JUD','계':'REV'
 };
+function toggleQuick(){
+  var qb=document.getElementById('quickBtns');
+  var icon=document.getElementById('quickToggleIcon');
+  var btn=document.getElementById('quickToggleBtn');
+  if(qb.classList.contains('open')){
+    qb.classList.remove('open');
+    icon.textContent='▾';
+    btn.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
+  } else {
+    qb.classList.add('open');
+    icon.textContent='▴';
+    btn.innerHTML='<span id="quickToggleIcon">▴</span> 예시 닫기';
+  }
+}
 function enterAnswerMode(){
   document.querySelector('.app').classList.add('answer-mode');
 }
