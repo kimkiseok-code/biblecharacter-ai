@@ -710,7 +710,7 @@ function buildCharBars(){
       var btn=document.createElement('button');
       btn.className='char-btn'; btn.dataset.char=id;
       btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
-      btn.addEventListener('click',function(){selectChar(id);});
+      btn.addEventListener('click',function(){selectChar(id);enterChatScreen();});
       otBar.appendChild(btn);
     });
   }
@@ -720,7 +720,7 @@ function buildCharBars(){
       var btn=document.createElement('button');
       btn.className='char-btn'; btn.dataset.char=id;
       btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
-      btn.addEventListener('click',function(){selectChar(id);});
+      btn.addEventListener('click',function(){selectChar(id);enterChatScreen();});
       ntBar.appendChild(btn);
     });
   }
