@@ -399,26 +399,35 @@ textarea:focus { border-color:var(--gold); }
   padding:24px 20px;
   background:var(--parchment);
 }
+.select-logo {
+  font-family:'Pretendard',sans-serif;
+  font-size:14px;
+  font-weight:700;
+  color:var(--gold);
+  text-align:center;
+  letter-spacing:0.04em;
+  margin-bottom:12px;
+}
 .select-title {
   font-family:'Pretendard',sans-serif;
-  font-size:17px;
+  font-size:18px;
   font-weight:700;
   color:var(--ink);
-  line-height:1.6;
-  margin-bottom:4px;
+  line-height:1.55;
+  margin-bottom:8px;
   text-align:center;
 }
 .select-sub {
   font-family:'Pretendard',sans-serif;
-  font-size:13px;
+  font-size:12.5px;
   color:var(--ink-soft);
   text-align:center;
-  margin-bottom:24px;
+  margin-bottom:20px;
 }
 .select-divider {
   width:40px; height:2px;
   background:var(--gold);
-  margin:0 auto 24px;
+  margin:0 auto 20px;
   border-radius:2px;
 }
 .select-section-label {
@@ -459,6 +468,7 @@ textarea:focus { border-color:var(--gold); }
 /* 대화 화면 - 상단 인물 메뉴 숨김 */
 .chat-screen .char-section { display:none !important; }
 .chat-screen .select-screen { display:none !important; }
+.app:not(.chat-screen) .header { display:none !important; }
 
 /* 인물 변경 버튼 */
 .change-char-btn {
@@ -536,12 +546,13 @@ textarea:focus { border-color:var(--gold); }
     </div>
   </div>
   <div class="select-screen" id="selectScreen">
-    <div class="select-title">오늘 누구의 이야기가<br>당신 마음에 닿나요?</div>
-    <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
+    <div class="select-logo">✦ BibleCharacter.AI</div>
     <div class="select-divider"></div>
-    <div class="select-section-label">📜 구약 (14인)</div>
+    <div class="select-title">하나님은 성경 속 인물들을 통해<br>오늘도 말씀하십니다</div>
+    <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
+    <div class="select-section-label">📜 구약</div>
     <div class="select-btn-grid" id="selectOtBar"></div>
-    <div class="select-section-label">✝️ 신약 (6인)</div>
+    <div class="select-section-label">✝️ 신약</div>
     <div class="select-btn-grid" id="selectNtBar"></div>
   </div>
   <div class="char-section">
