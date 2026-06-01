@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BibleCharacter.AI — 성경 인물 AI 멘토링</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a1610">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BibleChar.AI">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="description" content="성경 속 인물들과 나누는 AI 멘토링 — 다윗, 바울, 모세와 마음을 나눠보세요">
+<meta property="og:title" content="BibleCharacter.AI">
+<meta property="og:description" content="성경 속 인물들과 나누는 AI 멘토링">
+<meta property="og:image" content="/icon-512.png">
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
+<\/script>
 <style>
 
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
