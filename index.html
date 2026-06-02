@@ -629,12 +629,35 @@ textarea:focus { border-color:var(--gold); }
 <body>
 <div class="container">
 
-<div id="limitModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.85);align-items:center;justify-content:center;z-index:1000;padding:20px;">
-  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px;max-width:380px;width:100%;text-align:center;">
-    <div style="font-size:32px;margin-bottom:12px;">🙏</div>
-    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:12px;">이번 달 무료 횟수를 모두 사용했습니다</div>
-    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:24px;">무료 10회 대화가 모두 끝났습니다.<br>다음 달에 다시 이용하시거나<br>프리미엄으로 업그레이드하세요.</div>
-    <button onclick="closeLimitModal()" style="background:var(--gold);border:none;border-radius:12px;padding:12px 32px;font-family:'Pretendard',sans-serif;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;width:100%;">확인</button>
+<div id="limitModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.88);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px 24px;max-width:380px;width:100%;text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">✦</div>
+    <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 14px;border-radius:2px;"></div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 달 무료 횟수를 다 쓰셨어요</div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 플랜을 선택해 주세요 🙏</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+      <div style="background:white;border:1.5px solid rgba(184,149,42,0.4);border-radius:14px;padding:14px 16px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">월 2,900원</span>
+        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);">월 50회 대화 · 신앙 기록 보관</div>
+        <button onclick="startPayment('basic')" style="margin-top:10px;width:100%;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.4);border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:600;color:var(--ink-mid);cursor:pointer;">베이직 시작하기</button>
+      </div>
+
+      <div style="background:var(--ink);border:1.5px solid var(--gold);border-radius:14px;padding:14px 16px;text-align:left;position:relative;">
+        <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);font-family:'Pretendard',sans-serif;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">추천</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">월 4,900원</span>
+        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);">무제한 대화 · 신앙 기록 보관</div>
+        <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 시작하기</button>
+      </div>
+    </div>
+
+    <button onclick="closeLimitModal()" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">다음 달에 다시 이용하기</button>
   </div>
 </div>
 
