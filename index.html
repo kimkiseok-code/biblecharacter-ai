@@ -61,7 +61,7 @@
 window.doGoogleLogin = function() {
   var btn = document.getElementById('googleLoginBtn');
   if(btn) { btn.textContent='로그인 중...'; btn.disabled=true; }
-  window.location.href = '/api/auth/google';
+  window.location.href = '/api/google';
 };
 
 window._fbSignOut = function() {
