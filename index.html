@@ -102,7 +102,34 @@ document.addEventListener('click', function(e) {
   }
 });
 
-window.doLogout = function() {
+window.startPayment = function(plan) {
+  if(!window._currentUser) {
+    alert('로그인이 필요합니다.');
+    return;
+  }
+  const amount = plan === 'basic' ? 2900 : 4900;
+  const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직' : 'BibleCharacter.AI 프리미엄';
+  const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+
+  const clientKey = 'test_ck_LlDJaYngro2lnQOYgmynVezGdRpX';
+
+  const script = document.createElement('script');
+  script.src = 'https://js.tosspayments.com/v1/payment';
+  script.onload = function() {
+    const tossPayments = TossPayments(clientKey);
+    tossPayments.requestPayment('카드', {
+      amount,
+      orderId,
+      orderName,
+      customerName: window._currentUser.name || window._currentUser.email,
+      customerEmail: window._currentUser.email,
+      successUrl: window.location.origin + '/payment-success.html',
+      failUrl: window.location.origin + '/payment-fail.html',
+    });
+  };
+  document.head.appendChild(script);
+};
+  window.doLogout = function() {
   localStorage.removeItem('bca_user');
   localStorage.setItem('bca_guest_locked', 'true');
   window._currentUser = null;
