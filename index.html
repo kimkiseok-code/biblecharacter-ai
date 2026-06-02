@@ -56,9 +56,10 @@ function initFirebase() {
   var _db = firebase.firestore();
   var _provider = new firebase.auth.GoogleAuthProvider();
 
-  window._fbSignIn = function(){ return _auth.signInWithPopup(_provider); };
+  window._fbSignIn = function(){ return _auth.signInWithRedirect(_provider); };
   window._fbSignOut = function(){ return _auth.signOut(); };
 
+  _auth.getRedirectResult().catch(function(e){ console.error('redirect error:', e); });
   _auth.onAuthStateChanged(function(user) {
     if (user) {
       window._currentUser = user;
