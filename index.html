@@ -684,14 +684,22 @@ textarea:focus { border-color:var(--gold); }
   <div class="header">
     <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span><span class="logo-mini" id="logoMini"> · </span></div>
     <div class="header-right">
-      <div id="userInfo" style="display:flex;align-items:center;gap:6px;cursor:pointer;" onclick="showUserMenu()">
-        <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
-        <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-      </div>
-      <div id="userInfo" style="display:flex;align-items:center;gap:6px;cursor:pointer;" onclick="showUserMenu()">
-        <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;">
-        <span id="userName" style="font-size:11px;color:var(--gold);max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-      </div>
+      <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
+  <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
+  <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  <span style="font-size:10px;color:var(--ink-soft);">▾</span>
+  <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
+    <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
+  </div>
+</div>
+      <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
+  <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
+  <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  <span style="font-size:10px;color:var(--ink-soft);">▾</span>
+  <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
+    <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
+  </div>
+</div>
 
       <div id="usageCount" style="font-size:10px;color:#4CAF50;display:none;"></div>
       <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
