@@ -63,10 +63,14 @@ updateUsageDisplay();
 
 window._checkGuestLimit = function() {
   if(window._currentUser) return true;
+  if(localStorage.getItem('bca_guest_locked') === 'true') {
+    document.getElementById('loginPromptModal').style.display='flex';
+    return false;
+  }
   var count = parseInt(localStorage.getItem('bca_guest_count') || '0');
   if(count >= 3) {
-    var lm = document.getElementById('loginPromptModal');
-    if(lm) lm.style.display='flex';
+    localStorage.setItem('bca_guest_locked', 'true');
+    document.getElementById('loginPromptModal').style.display='flex';
     return false;
   }
   localStorage.setItem('bca_guest_count', count + 1);
