@@ -23,22 +23,12 @@
 </script>
 
 <script>
-// 로그인 상태 확인 (localStorage 기반)
+// 로그인 상태 확인 + 비로그인 3회 무료 체험
 (function() {
   var saved = localStorage.getItem('bca_user');
   if (saved) {
-    try {
-      window._currentUser = JSON.parse(saved);
-      document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('#loginScreen').forEach(function(el){ el.style.display='none'; });
-        var ma = document.getElementById('mainApp');
-        if(ma) ma.style.display='block';
-        if(window._startAppAfterLogin) window._startAppAfterLogin();
-      });
-    } catch(e) { localStorage.removeItem('bca_user'); }
+    try { window._currentUser = JSON.parse(saved); } catch(e) { localStorage.removeItem('bca_user'); }
   }
-
-  // URL에서 로그인 결과 확인 (OAuth 리다이렉트 후)
   var params = new URLSearchParams(window.location.search);
   var token = params.get('bca_token');
   if (token) {
@@ -49,14 +39,44 @@
           localStorage.setItem('bca_user', JSON.stringify(user));
           window._currentUser = user;
           window.history.replaceState({}, '', '/');
-          document.querySelectorAll('#loginScreen').forEach(function(el){ el.style.display='none'; });
-          var ma = document.getElementById('mainApp');
-          if(ma) ma.style.display='block';
-          if(window._startAppAfterLogin) window._startAppAfterLogin();
+          var lm = document.getElementById('loginPromptModal');
+          if(lm) lm.style.display='none';
+          var countEl = document.getElementById('usageCount');
+          if(countEl) countEl.style.display='inline';
+          updateUsageDisplay();
         }
       }).catch(function(){});
   }
+  document.addEventListener('DOMContentLoaded', function() {
+    var ls = document.getElementById('loginScreen');
+    if(ls) ls.style.display='none';
+    updateUsageDisplay();
+  });
 })();
+
+window._checkGuestLimit = function() {
+  if(window._currentUser) return true;
+  var count = parseInt(localStorage.getItem('bca_guest_count') || '0');
+  if(count >= 3) {
+    var lm = document.getElementById('loginPromptModal');
+    if(lm) lm.style.display='flex';
+    return false;
+  }
+  localStorage.setItem('bca_guest_count', count + 1);
+  return true;
+};
+
+function updateUsageDisplay() {
+  var countEl = document.getElementById('usageCount');
+  if(!countEl) return;
+  if(window._currentUser) {
+    var used = parseInt(localStorage.getItem('bca_count') || '0');
+    countEl.textContent = '무료 ' + used + '/10회 사용';
+    countEl.style.display = 'inline';
+  } else {
+    countEl.style.display = 'none';
+  }
+}
 
 window.doGoogleLogin = function() {
   var btn = document.getElementById('googleLoginBtn');
