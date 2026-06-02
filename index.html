@@ -38,6 +38,13 @@
         if(user && user.email) {
           localStorage.setItem('bca_user', JSON.stringify(user));
           window._currentUser = user;
+          var ui = document.getElementById('userInfo');
+if(ui) { ui.style.display='flex'; }
+var up = document.getElementById('userPhoto');
+if(up && user.picture) { up.src=user.picture; up.style.display='block'; }
+var un = document.getElementById('userName');
+if(un) un.textContent = user.name || user.email;
+updateUsageDisplay();
           window.history.replaceState({}, '', '/');
           var lm = document.getElementById('loginPromptModal');
           if(lm) lm.style.display='none';
