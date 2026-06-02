@@ -891,8 +891,7 @@ function updateUserInfo(){
 function showUserMenu(){
   var user = window._currentUser;
   if(!user) return;
-  if(confirm(user.displayName+'님
-로그아웃 하시겠습니까?')){
+  if(confirm((user.displayName||user.email)+'님 로그아웃 하시겠습니까?')){
     if(window._fbSignOut) window._fbSignOut();
   }
 }
