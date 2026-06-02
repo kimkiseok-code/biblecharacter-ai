@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>결제 완료 — BibleCharacter.AI</title>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1A1610; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Pretendard', sans-serif; padding: 20px; }
+.box { background: #FAF6EC; border: 1px solid rgba(184,149,42,0.4); border-radius: 18px; padding: 40px 32px; max-width: 380px; width: 100%; text-align: center; }
+.icon { font-size: 40px; margin-bottom: 12px; }
+.divider { width: 40px; height: 2px; background: #B8952A; margin: 0 auto 16px; border-radius: 2px; }
+.title { font-size: 20px; font-weight: 700; color: #2A2318; margin-bottom: 10px; }
+.desc { font-size: 13px; color: #5A4E3A; line-height: 1.8; margin-bottom: 28px; }
+.btn { display: block; width: 100%; background: #B8952A; border: none; border-radius: 12px; padding: 14px; font-family: 'Pretendard', sans-serif; font-size: 14px; font-weight: 700; color: #2A2318; cursor: pointer; text-decoration: none; }
+.btn:hover { background: #9A7A1E; }
+.loading { font-size: 13px; color: #8A7A60; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="icon">✦</div>
+  <div class="divider"></div>
+  <div class="title">결제가 완료됐어요!</div>
+  <div class="desc" id="desc">잠시만 기다려주세요...<br>결제를 확인하고 있습니다.</div>
+  <div class="loading" id="loading">처리 중...</div>
+  <a href="/" class="btn" id="homeBtn" style="display:none;">말씀 멘토링 시작하기 🙏</a>
+</div>
+
+<script>
+(async function() {
+  const params = new URLSearchParams(window.location.search);
+  const paymentKey = params.get('paymentKey');
+  const orderId = params.get('orderId');
+  const amount = parseInt(params.get('amount'));
+
+  try {
+    const res = await fetch('/api/payment-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentKey, orderId, amount }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      // 플랜 정보 localStorage에 저장
+      localStorage.setItem('bca_plan', data.plan);
+      localStorage.setItem('bca_plan_month', data.month);
+      const limit = data.plan === 'basic' ? 50 : 99999;
+      localStorage.setItem('bca_limit', limit);
+
+      document.getElementById('desc').innerHTML =
+        data.plan === 'premium'
+          ? '프리미엄 플랜이 활성화됐어요!<br>이제 무제한으로 말씀을 나눌 수 있습니다. 🙏'
+          : '베이직 플랜이 활성화됐어요!<br>이번 달 50회 대화를 이용하실 수 있습니다. 🙏';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('homeBtn').style.display = 'block';
+    } else {
+      document.getElementById('desc').textContent = '결제 확인 중 오류가 발생했습니다. 고객센터로 문의해주세요.';
+      document.getElementById('loading').style.display = 'none';
+    }
+  } catch(e) {
+    document.getElementById('desc').textContent = '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    document.getElementById('loading').style.display = 'none';
+  }
+})();
+</script>
+</body>
+</html>
