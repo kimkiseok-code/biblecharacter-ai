@@ -54,7 +54,14 @@ function initFirebase() {
   var _db = firebase.firestore();
   var _provider = new firebase.auth.GoogleAuthProvider();
 
-  window._fbSignIn = function(){ return _auth.signInWithRedirect(_provider); };
+  window._fbSignIn = function(){
+    return _auth.signInWithPopup(_provider).catch(function(e){
+      if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user'){
+        return _auth.signInWithRedirect(_provider);
+      }
+      throw e;
+    });
+  };
   window._fbSignOut = function(){ return _auth.signOut(); };
 
   var btn = document.getElementById('googleLoginBtn');
