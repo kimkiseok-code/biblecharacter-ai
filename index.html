@@ -22,96 +22,61 @@
   }
 </script>
 
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-
-function initFirebase() {
-  var firebaseConfig = {
-    apiKey: "AIzaSyDwvvWyu93bDE1Ho_qdD3pb49H5EXjVTA0",
-    authDomain: "biblecharacter-ai.firebaseapp.com",
-    projectId: "biblecharacter-ai",
-    storageBucket: "biblecharacter-ai.firebasestorage.app",
-    messagingSenderId: "1048588424413",
-    appId: "1:1048588424413:web:5318d62b31c31eabaa3734"
-  };
-  const _app = initializeApp(firebaseConfig);
-  const _auth = getAuth(_app);
-  const _db = getFirestore(_app);
-  const _provider = new GoogleAuthProvider();
-
-  
-  window._fbSignIn = function(){ return signInWithRedirect(_auth, _provider); };
-  window._fbSignOut = function(){ return signOut(_auth); };
-
-  var btn = document.getElementById('googleLoginBtn');
-  if(btn) { btn.disabled = false; btn.style.opacity = '1'; }
-
-  function handleUser(user) {
-    if (user) {
-      window._currentUser = user;
-      const _ref = doc(_db, 'users', user.uid);
-      getDoc(_ref).then(function(snap) {
-        if (!snap.exists()) {
-          setDoc(_ref, {
-            email: user.email,
-            name: user.displayName,
-            photo: user.photoURL,
-            plan: 'free',
-            monthlyUsage: 0,
-            usageMonth: new Date().toISOString().slice(0,7),
-            createdAt: new Date().toISOString()
-          });
-        }
+<script>
+// 로그인 상태 확인 (localStorage 기반)
+(function() {
+  var saved = localStorage.getItem('bca_user');
+  if (saved) {
+    try {
+      window._currentUser = JSON.parse(saved);
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#loginScreen').forEach(function(el){ el.style.display='none'; });
+        var ma = document.getElementById('mainApp');
+        if(ma) ma.style.display='block';
+        if(window._startAppAfterLogin) window._startAppAfterLogin();
       });
-      document.querySelectorAll('#loginScreen').forEach(function(el){el.style.display='none';});
-      document.getElementById('mainApp').style.display = 'block';
-      if(window._startAppAfterLogin) window._startAppAfterLogin();
-    } else {
-      window._currentUser = null;
-      document.querySelectorAll('#loginScreen').forEach(function(el){el.style.display='flex';});
-      document.getElementById('mainApp').style.display = 'none';
-    }
+    } catch(e) { localStorage.removeItem('bca_user'); }
   }
 
-  // 즉시 currentUser 확인
-  setTimeout(function() {
-    var cu = _auth.currentUser;
-    console.log('immediate check:', cu ? cu.email : 'null');
-    if (cu) { handleUser(cu); return; }
-  }, 500);
+  // URL에서 로그인 결과 확인 (OAuth 리다이렉트 후)
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('bca_token');
+  if (token) {
+    fetch('/api/verify?token=' + token)
+      .then(function(r){ return r.json(); })
+      .then(function(user) {
+        if(user && user.email) {
+          localStorage.setItem('bca_user', JSON.stringify(user));
+          window._currentUser = user;
+          window.history.replaceState({}, '', '/');
+          document.querySelectorAll('#loginScreen').forEach(function(el){ el.style.display='none'; });
+          var ma = document.getElementById('mainApp');
+          if(ma) ma.style.display='block';
+          if(window._startAppAfterLogin) window._startAppAfterLogin();
+        }
+      }).catch(function(){});
+  }
+})();
 
-  getRedirectResult(_auth).then(function(result) {
-    console.log('redirectResult:', result && result.user ? result.user.email : 'null');
-    if (result && result.user) {
-      handleUser(result.user);
-    }
-  }).catch(function(e) {
-    console.error('redirect error:', e.code, e.message);
-  });
-
-  onAuthStateChanged(_auth, function(user) {
-    console.log('authStateChanged:', user ? user.email : 'null');
-    handleUser(user);
-  });
-
-  window.doGoogleLogin = function() {
+window.doGoogleLogin = function() {
   var btn = document.getElementById('googleLoginBtn');
-  if(btn) btn.textContent = '로그인 중...';
-  if(window._fbSignIn) {
-    window._fbSignIn().catch(function(e) {
-      if(btn) btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Google로 시작하기';
-      alert('로그인 실패: ' + e.message);
-    });
-  } else {
-    alert('Firebase 로딩 중입니다. 잠시 후 다시 시도해주세요.');
-    if(btn) btn.textContent = 'Google로 시작하기';
-  }
+  if(btn) { btn.textContent='로그인 중...'; btn.disabled=true; }
+  window.location.href = '/api/auth/google';
 };
-}
 
-initFirebase();
+window._fbSignOut = function() {
+  localStorage.removeItem('bca_user');
+  window._currentUser = null;
+  window.location.reload();
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('googleLoginBtn');
+  if(btn && !localStorage.getItem('bca_user')) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+});
 </script>
 <style>
 
