@@ -100,7 +100,7 @@ document.addEventListener('click', function(e) {
 
 window.doLogout = function() {
   localStorage.removeItem('bca_user');
-  localStorage.removeItem('bca_count');
+  localStorage.setItem('bca_guest_locked', 'true');
   window._currentUser = null;
   var ui = document.getElementById('userInfo');
   if(ui) ui.style.display = 'none';
