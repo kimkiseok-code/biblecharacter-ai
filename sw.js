@@ -1,4 +1,4 @@
-const CACHE = 'bca-v1';
+const CACHE = 'bca-v2';
 const ASSETS = ['/', '/index.html', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -16,8 +16,13 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // API 요청은 캐시 안 함
-  if (e.request.url.includes('/api/')) return;
+  const url = e.request.url;
+
+  // chrome-extension, API, firebase 요청은 캐시 안 함
+  if (url.startsWith('chrome-extension://')) return;
+  if (url.includes('/api/')) return;
+  if (url.includes('firebase') || url.includes('googleapis') || url.includes('gstatic')) return;
+  if (e.request.method !== 'GET') return;
 
   e.respondWith(
     caches.match(e.request).then(cached => {
