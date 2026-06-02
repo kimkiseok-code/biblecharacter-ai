@@ -88,23 +88,25 @@ function initFirebase() {
     }
   }
 
+  // 즉시 currentUser 확인
+  setTimeout(function() {
+    var cu = _auth.currentUser;
+    console.log('immediate check:', cu ? cu.email : 'null');
+    if (cu) { handleUser(cu); return; }
+  }, 500);
+
+  _auth.getRedirectResult().then(function(result) {
+    console.log('redirectResult:', result && result.user ? result.user.email : 'null');
+    if (result && result.user) {
+      handleUser(result.user);
+    }
+  }).catch(function(e) {
+    console.error('redirect error:', e.code, e.message);
+  });
+
   _auth.onAuthStateChanged(function(user) {
     console.log('authStateChanged:', user ? user.email : 'null');
-    if (user) {
-      handleUser(user);
-    } else {
-      _auth.getRedirectResult().then(function(result) {
-        console.log('redirectResult:', result ? result.user : 'null');
-        if (result && result.user) {
-          handleUser(result.user);
-        } else {
-          handleUser(null);
-        }
-      }).catch(function(e) {
-        console.error('redirect error:', e.code, e.message);
-        handleUser(null);
-      });
-    }
+    handleUser(user);
   });
 }
 
