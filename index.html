@@ -43,7 +43,7 @@ function loadFirebase(callback) {
 function initFirebase() {
   var firebaseConfig = {
     apiKey: "AIzaSyDwvvWyu93bDE1Ho_qdD3pb49H5EXjVTA0",
-    authDomain: "biblecharacter-ai.vercel.app",
+    authDomain: "biblecharacter-ai.firebaseapp.com",
     projectId: "biblecharacter-ai",
     storageBucket: "biblecharacter-ai.firebasestorage.app",
     messagingSenderId: "1048588424413",
@@ -88,16 +88,23 @@ function initFirebase() {
     }
   }
 
-  _auth.getRedirectResult().then(function(result) {
-    if (result && result.user) {
-      handleUser(result.user);
-    }
-  }).catch(function(e) {
-    console.error('redirect error:', e.message);
-  });
-
   _auth.onAuthStateChanged(function(user) {
-    handleUser(user);
+    console.log('authStateChanged:', user ? user.email : 'null');
+    if (user) {
+      handleUser(user);
+    } else {
+      _auth.getRedirectResult().then(function(result) {
+        console.log('redirectResult:', result ? result.user : 'null');
+        if (result && result.user) {
+          handleUser(result.user);
+        } else {
+          handleUser(null);
+        }
+      }).catch(function(e) {
+        console.error('redirect error:', e.code, e.message);
+        handleUser(null);
+      });
+    }
   });
 }
 
