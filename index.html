@@ -1220,7 +1220,12 @@ function getMonthKey(){
   return d.getFullYear()+'_'+(d.getMonth()+1);
 }
 function updateUsageDisplay(count){
-  var LIMIT=10;
+  var plan = localStorage.getItem('bca_plan');
+var planMonth = localStorage.getItem('bca_plan_month');
+var currentMonth = getMonthKey();
+var LIMIT = (plan && planMonth === currentMonth)
+  ? (plan === 'premium' ? 99999 : 50)
+  : 7;
   var el=document.getElementById('usageCount');
   if(!el) return;
   if(count===-1){
