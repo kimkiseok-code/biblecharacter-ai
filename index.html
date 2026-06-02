@@ -57,10 +57,10 @@ function initFirebase() {
   window._fbSignIn = function(){ return _auth.signInWithRedirect(_provider); };
   window._fbSignOut = function(){ return _auth.signOut(); };
 
-  _auth.getRedirectResult().catch(function(e){ console.error('redirect error:', e); });
   var btn = document.getElementById('googleLoginBtn');
   if(btn) { btn.disabled = false; btn.style.opacity = '1'; }
-  _auth.onAuthStateChanged(function(user) {
+
+  function handleUser(user) {
     if (user) {
       window._currentUser = user;
       var ref = _db.collection('users').doc(user.uid);
@@ -85,6 +85,18 @@ function initFirebase() {
       document.getElementById('loginScreen').style.display = 'flex';
       document.getElementById('mainApp').style.display = 'none';
     }
+  }
+
+  _auth.getRedirectResult().then(function(result) {
+    if (result && result.user) {
+      handleUser(result.user);
+    }
+  }).catch(function(e) {
+    console.error('redirect error:', e.message);
+  });
+
+  _auth.onAuthStateChanged(function(user) {
+    handleUser(user);
   });
 }
 
