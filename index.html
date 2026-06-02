@@ -78,7 +78,29 @@ function updateUsageDisplay() {
   }
 }
 
-window.doGoogleLogin = function() {
+window.toggleUserMenu = function() {
+  var menu = document.getElementById('userMenu');
+  if(menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+};
+
+document.addEventListener('click', function(e) {
+  if(!e.target.closest('#userInfo')) {
+    var menu = document.getElementById('userMenu');
+    if(menu) menu.style.display = 'none';
+  }
+});
+
+window.doLogout = function() {
+  localStorage.removeItem('bca_user');
+  localStorage.removeItem('bca_count');
+  window._currentUser = null;
+  var ui = document.getElementById('userInfo');
+  if(ui) ui.style.display = 'none';
+  var uc = document.getElementById('usageCount');
+  if(uc) uc.style.display = 'none';
+  window.location.reload();
+};
+  window.doGoogleLogin = function() {
   var btn = document.getElementById('googleLoginBtn');
   if(btn) { btn.textContent='로그인 중...'; btn.disabled=true; }
   window.location.href = '/api/google';
