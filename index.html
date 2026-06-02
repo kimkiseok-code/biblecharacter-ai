@@ -78,12 +78,12 @@ function initFirebase() {
           });
         }
       });
-      document.getElementById('loginScreen').style.display = 'none';
+      document.querySelectorAll('#loginScreen').forEach(function(el){el.style.display='none';});
       document.getElementById('mainApp').style.display = 'block';
       if(window._startAppAfterLogin) window._startAppAfterLogin();
     } else {
       window._currentUser = null;
-      document.getElementById('loginScreen').style.display = 'flex';
+      document.querySelectorAll('#loginScreen').forEach(function(el){el.style.display='flex';});
       document.getElementById('mainApp').style.display = 'none';
     }
   }
@@ -671,15 +671,6 @@ textarea:focus { border-color:var(--gold); }
 </div>
 
 <div class="toast" id="toast"></div>
-
-<div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#1a1610;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:0;">
-  <div style="text-align:center;padding:40px 32px;max-width:360px;width:100%;">
-    <div style="font-size:28px;color:#d4af5a;font-weight:700;letter-spacing:1px;margin-bottom:6px;">✦ BibleCharacter.AI</div>
-    <div style="font-size:13px;color:#b8952a;margin-bottom:40px;letter-spacing:0.5px;">성경 인물 AI 멘토링</div>
-    <img src="/icon-192.png" style="width:96px;height:96px;border-radius:24px;margin-bottom:32px;box-shadow:0 0 40px rgba(184,149,42,0.2);">
-    <div style="font-size:16px;color:#e8d48a;font-weight:500;margin-bottom:8px;">하나님은 성경 속 인물들을 통해</div>
-    <div style="font-size:16px;color:#e8d48a;font-weight:500;margin-bottom:32px;">오늘도 말씀하십니다</div>
-
 
 <div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#1a1610;align-items:center;justify-content:center;z-index:9999;flex-direction:column;">
   <div style="text-align:center;padding:40px 32px;max-width:360px;width:100%;">
