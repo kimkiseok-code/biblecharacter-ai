@@ -77,7 +77,8 @@ function updateUsageDisplay() {
   var countEl = document.getElementById('usageCount');
   if(!countEl) return;
   if(window._currentUser) {
-    var used = parseInt(localStorage.getItem('bca_count') || '0');
+    var month = new Date().getFullYear()+'_'+(new Date().getMonth()+1);
+var used = parseInt(localStorage.getItem('bca_usage_'+month) || '0');
     countEl.textContent = '무료 ' + used + '/10회 사용';
     countEl.style.display = 'inline';
   } else {
