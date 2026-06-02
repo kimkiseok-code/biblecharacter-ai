@@ -22,23 +22,10 @@
   }
 </script>
 
-<script>
-function loadFirebase(callback) {
-  var scripts = [
-    'https://cdn.jsdelivr.net/npm/firebase@8.10.1/firebase-app.min.js',
-    'https://cdn.jsdelivr.net/npm/firebase@8.10.1/firebase-auth.min.js',
-    'https://cdn.jsdelivr.net/npm/firebase@8.10.1/firebase-firestore.min.js'
-  ];
-  function loadNext(i) {
-    if (i >= scripts.length) { callback(); return; }
-    var s = document.createElement('script');
-    s.src = scripts[i];
-    s.onload = function() { loadNext(i + 1); };
-    s.onerror = function() { console.error('Firebase 로드 실패:', scripts[i]); };
-    document.head.appendChild(s);
-  }
-  loadNext(0);
-}
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
 function initFirebase() {
   var firebaseConfig = {
@@ -49,14 +36,14 @@ function initFirebase() {
     messagingSenderId: "1048588424413",
     appId: "1:1048588424413:web:5318d62b31c31eabaa3734"
   };
-  firebase.initializeApp(firebaseConfig);
-  var _auth = firebase.auth();
-  var _db = firebase.firestore();
-  var _provider = new firebase.auth.GoogleAuthProvider();
+  const _app = initializeApp(firebaseConfig);
+  const _auth = getAuth(_app);
+  const _db = getFirestore(_app);
+  const _provider = new GoogleAuthProvider();
 
-  _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-  window._fbSignIn = function(){ return _auth.signInWithRedirect(_provider); };
-  window._fbSignOut = function(){ return _auth.signOut(); };
+  
+  window._fbSignIn = function(){ return signInWithRedirect(_auth, _provider); };
+  window._fbSignOut = function(){ return signOut(_auth); };
 
   var btn = document.getElementById('googleLoginBtn');
   if(btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -64,10 +51,10 @@ function initFirebase() {
   function handleUser(user) {
     if (user) {
       window._currentUser = user;
-      var ref = _db.collection('users').doc(user.uid);
-      ref.get().then(function(snap) {
-        if (!snap.exists) {
-          ref.set({
+      const _ref = doc(_db, 'users', user.uid);
+      getDoc(_ref).then(function(snap) {
+        if (!snap.exists()) {
+          setDoc(_ref, {
             email: user.email,
             name: user.displayName,
             photo: user.photoURL,
@@ -95,7 +82,7 @@ function initFirebase() {
     if (cu) { handleUser(cu); return; }
   }, 500);
 
-  _auth.getRedirectResult().then(function(result) {
+  getRedirectResult(_auth).then(function(result) {
     console.log('redirectResult:', result && result.user ? result.user.email : 'null');
     if (result && result.user) {
       handleUser(result.user);
@@ -104,13 +91,12 @@ function initFirebase() {
     console.error('redirect error:', e.code, e.message);
   });
 
-  _auth.onAuthStateChanged(function(user) {
+  onAuthStateChanged(_auth, function(user) {
     console.log('authStateChanged:', user ? user.email : 'null');
     handleUser(user);
   });
-}
 
-window.doGoogleLogin = function() {
+  window.doGoogleLogin = function() {
   var btn = document.getElementById('googleLoginBtn');
   if(btn) btn.textContent = '로그인 중...';
   if(window._fbSignIn) {
@@ -124,9 +110,7 @@ window.doGoogleLogin = function() {
   }
 };
 
-window.addEventListener('load', function() {
-  loadFirebase(initFirebase);
-});
+initFirebase();
 </script>
 <style>
 
