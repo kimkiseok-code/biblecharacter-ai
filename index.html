@@ -701,20 +701,51 @@ textarea:focus { border-color:var(--gold); }
     <button onclick="document.getElementById('loginPromptModal').style.display='none'" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">나중에 하기</button>
   </div>
 </div><div class="welcome-overlay" id="welcomeOverlay">
-  <div class="welcome-box">
+  <div class="welcome-box" id="welcomeBox">
     <div class="welcome-cross">✦</div>
     <div class="welcome-divider"></div>
-    <div class="welcome-title">오늘 마음이 많이 무거우신가요?</div>
-    <div class="welcome-body">하나님은 성경 속 인물들의 삶을 통해
-오늘 우리에게도 말씀하고 계십니다.
-
-모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로
-당신의 고민에 말씀으로 응답합니다.
-
-인물을 선택하고 지금 마음을 나눠보세요. 🙏</div>
-    <button class="welcome-btn" onclick="closeWelcome()">시작하기</button>
+    <div class="welcome-title" id="welcomeTitle"></div>
+    <div class="welcome-body" id="welcomeBody"></div>
+    <button class="welcome-btn" id="welcomeBtn" onclick="closeWelcome()">시작하기</button>
   </div>
 </div>
+
+<script>
+(function(){
+  var messages = [
+    {title:"오늘 마음이 많이 무거우신가요?", body:"하나님은 성경 속 인물들의 삶을 통해\n오늘 우리에게도 말씀하고 계십니다.\n\n모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로\n당신의 고민에 말씀으로 응답합니다.\n\n인물을 선택하고 지금 마음을 나눠보세요. 🙏", bg:"#FAF6EC", btn:"#B8952A"},
+    {title:"두려움이 앞을 막고 있나요?", body:"여호수아도 두려웠습니다.\n그러나 하나님은 말씀하셨습니다.\n'강하고 담대하라.'\n\n지금 그 말씀을 함께 들어보세요. 🙏", bg:"#F5F0E8", btn:"#A07820"},
+    {title:"기다림이 너무 길게 느껴지나요?", body:"아브라함은 25년을 기다렸습니다.\n그 기다림 속에서도 하나님은 일하고 계셨습니다.\n\n당신의 기다림 이야기를 나눠보세요. 🙏", bg:"#F8F3E6", btn:"#B8952A"},
+    {title:"외로움이 밀려오는 날인가요?", body:"엘리야도 광야에서 홀로 앉아\n'나만 남았다'고 했습니다.\n\n하나님은 그때도 함께하셨습니다.\n오늘 그 이야기를 들어보세요. 🙏", bg:"#F3EFE8", btn:"#967018"},
+    {title:"용서가 너무 어렵게 느껴지나요?", body:"요셉은 자신을 판 형제들을 용서했습니다.\n그 용서가 어떻게 가능했는지\n함께 이야기 나눠보세요. 🙏", bg:"#FAF7EE", btn:"#B8952A"},
+    {title:"믿음이 흔들리고 있나요?", body:"도마도 의심했습니다.\n그러나 예수님은 그를 외면하지 않으셨습니다.\n\n흔들리는 믿음을 솔직하게 나눠보세요. 🙏", bg:"#F6F1E9", btn:"#A07820"},
+    {title:"상처받은 마음을 안고 계신가요?", body:"다윗은 배신과 고통 속에서도\n하나님께 시편을 드렸습니다.\n\n당신의 상처를 말씀으로 위로받아 보세요. 🙏", bg:"#F9F4EB", btn:"#B8952A"},
+    {title:"새로운 시작 앞에 서 계신가요?", body:"루스는 모든 것을 뒤로하고\n새로운 땅에서 새 삶을 시작했습니다.\n\n당신의 새 출발을 함께 나눠보세요. 🙏", bg:"#F4F0E6", btn:"#907010"},
+    {title:"사명을 잃어버린 것 같은가요?", body:"바울은 감옥에서도 편지를 썼습니다.\n환경이 사명을 막을 수 없었습니다.\n\n당신의 사명 이야기를 나눠보세요. 🙏", bg:"#F7F2E8", btn:"#B8952A"},
+    {title:"하나님이 멀게 느껴지는 날인가요?", body:"시편 기자는 '어찌하여 숨으시나이까' 했습니다.\n그 솔직한 기도가 하나님께 닿았습니다.\n\n오늘 솔직하게 마음을 나눠보세요. 🙏", bg:"#F5F1E7", btn:"#A07820"},
+    {title:"감사가 넘치는 하루인가요?", body:"한나는 응답받은 후 온 마음으로 찬양했습니다.\n오늘의 감사를 함께 나눠보세요.\n\n말씀으로 더 깊은 감사를 경험해 보세요. 🙏", bg:"#FBF8EE", btn:"#C8A030"},
+    {title:"결단을 내려야 할 순간인가요?", body:"에스더는 '죽으면 죽으리라'며 나아갔습니다.\n그 용기는 어디서 왔을까요?\n\n함께 이야기 나눠보세요. 🙏", bg:"#F6F2E8", btn:"#B8952A"},
+    {title:"자신이 너무 작게 느껴지나요?", body:"기드온은 '나는 가장 약한 자'라고 했습니다.\n하나님은 그를 용사라 부르셨습니다.\n\n당신도 하나님의 눈으로 보여드릴게요. 🙏", bg:"#F4EFE5", btn:"#967018"},
+    {title:"관계가 힘들고 지치셨나요?", body:"요나단과 다윗의 우정은\n어떤 상황에서도 변하지 않았습니다.\n\n관계의 어려움을 함께 나눠보세요. 🙏", bg:"#F8F4EA", btn:"#A07820"},
+    {title:"죄책감이 짓누르고 있나요?", body:"베드로는 세 번 부인했지만\n예수님은 세 번 회복시키셨습니다.\n\n당신의 무거운 마음을 나눠보세요. 🙏", bg:"#F5F0E7", btn:"#B8952A"},
+    {title:"미래가 불안하게 느껴지나요?", body:"노아는 비가 오기 전에 방주를 지었습니다.\n보이지 않아도 믿음으로 준비했습니다.\n\n불안한 미래를 함께 이야기해요. 🙏", bg:"#F9F5EB", btn:"#907010"},
+    {title:"지쳐서 포기하고 싶으신가요?", body:"엘리야는 광야에서 '죽기를 원한다'고 했습니다.\n하나님은 그에게 음식을 주시고\n다시 일으키셨습니다. 🙏", bg:"#F3EEE4", btn:"#967018"},
+    {title:"하나님의 뜻을 알고 싶으신가요?", body:"솔로몬은 지혜를 구했습니다.\n하나님은 기뻐하시며 그 이상을 주셨습니다.\n\n오늘 당신의 기도를 나눠보세요. 🙏", bg:"#F7F3E9", btn:"#B8952A"},
+    {title:"오늘 하루도 수고 많으셨나요?", body:"하나님은 당신의 하루를 보고 계셨습니다.\n쉬지 못한 마음, 지친 몸도\n모두 아십니다.\n\n오늘의 이야기를 나눠보세요. 🙏", bg:"#FBF7ED", btn:"#C8A030"},
+    {title:"새벽에 홀로 깨어 계신가요?", body:"야곱은 얍복 강가에서 밤새 씨름했습니다.\n그 씨름 끝에 축복이 있었습니다.\n\n새벽의 마음을 함께 나눠보세요. 🙏", bg:"#F2EDE3", btn:"#907010"},
+  ];
+  var idx = Math.floor(Math.random() * messages.length);
+  var m = messages[idx];
+  var box = document.getElementById('welcomeBox');
+  if(box) box.style.background = m.bg;
+  var btn = document.getElementById('welcomeBtn');
+  if(btn) btn.style.background = m.btn;
+  var title = document.getElementById('welcomeTitle');
+  if(title) title.textContent = m.title;
+  var body = document.getElementById('welcomeBody');
+  if(body) body.innerHTML = m.body.replace(/\n/g,'<br>');
+})();
+</script>
 
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
   <div class="drawer">
