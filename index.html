@@ -700,15 +700,7 @@ textarea:focus { border-color:var(--gold); }
     </button>
     <button onclick="document.getElementById('loginPromptModal').style.display='none'" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">나중에 하기</button>
   </div>
-<div class="welcome-overlay" id="welcomeOverlay">
-  <div class="welcome-box" id="welcomeBox">
-    <div class="welcome-cross">✦</div>
-    <div class="welcome-divider"></div>
-    <div class="welcome-title" id="welcomeTitle"></div>
-    <div class="welcome-body" id="welcomeBody"></div>
-    <button class="welcome-btn" id="welcomeBtn" onclick="closeWelcome()">시작하기</button>
-  </div>
-</div>
+
 
 <script>
 (function(){
@@ -738,11 +730,11 @@ textarea:focus { border-color:var(--gold); }
   var m = messages[idx];
   var box = document.getElementById('welcomeBox');
   if(box) box.style.background = m.bg;
-  var btn = document.getElementById('welcomeBtn');
+  var btn = document.getElementById('welcomeBtn2');
   if(btn) btn.style.background = m.btn;
-  var title = document.getElementById('welcomeTitle');
+  var title = document.getElementById('welcomeTitle2');
   if(title) title.textContent = m.title;
-  var body = document.getElementById('welcomeBody');
+  var body = document.getElementById('welcomeBody2');
   if(body) body.innerHTML = m.body.replace(/\n/g,'<br>');
 })();
 </script>
