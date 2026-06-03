@@ -1035,7 +1035,8 @@ let currentChar='', messages=[], isLoading=false;
 
 function startApp(){
   buildCharBars(); initUsage(); updateUserInfo();
-}
+var wo = document.getElementById('welcomeOverlay');
+if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
 window._startAppAfterLogin = startApp;
 
 function updateUserInfo(){
