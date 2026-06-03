@@ -707,7 +707,7 @@ textarea:focus { border-color:var(--gold); }
 document.addEventListener('DOMContentLoaded', function(){
 (function(){
   var messages = [
-    {title:"오늘 마음이 많이 무거우신가요?", body:"하나님은 성경 속 인물들의 삶을 통해\n오늘 우리에게도 말씀하고 계십니다.\n\n모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로\n당신의 고민에 말씀으로 응답합니다.\n\n인물을 선택하고 지금 마음을 나눠보세요. 🙏", bg:"#FAF6EC", btn:"#B8952A"},
+    {title:"오늘 마음이 많이 무거우신가요?", body:"하나님은 성경 속 인물들의 삶을 통해\n오늘 우리에게도 말씀하고 계십니다.\n\n모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로\n당신의 고민에 말씀으로 응답합니다.", bg:"#FAF6EC", btn:"#B8952A"},
     {title:"두려움이 앞을 막고 있나요?", body:"여호수아도 두려웠습니다.\n그러나 하나님은 말씀하셨습니다.\n'강하고 담대하라.'\n\n지금 그 말씀을 함께 들어보세요. 🙏", bg:"#F5F0E8", btn:"#A07820"},
     {title:"기다림이 너무 길게 느껴지나요?", body:"아브라함은 25년을 기다렸습니다.\n그 기다림 속에서도 하나님은 일하고 계셨습니다.\n\n당신의 기다림 이야기를 나눠보세요. 🙏", bg:"#F8F3E6", btn:"#B8952A"},
     {title:"외로움이 밀려오는 날인가요?", body:"엘리야도 광야에서 홀로 앉아\n'나만 남았다'고 했습니다.\n\n하나님은 그때도 함께하셨습니다.\n오늘 그 이야기를 들어보세요. 🙏", bg:"#F3EFE8", btn:"#967018"},
@@ -737,7 +737,7 @@ document.addEventListener('DOMContentLoaded', function(){
   var title = document.getElementById('welcomeTitle2');
   if(title) title.textContent = m.title;
   var body = document.getElementById('welcomeBody2');
-  if(body) body.innerHTML = m.body.replace(/\n/g,'<br>');
+  if(body) body.innerHTML = m.body.replace(/\n/g,'<br>') + '<br><br>인물을 선택하고 지금 마음을 나눠보세요. 🙏';
 })();
 });
 </script>
