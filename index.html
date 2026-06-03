@@ -1483,5 +1483,14 @@ startApp();
   </div>
   <div style="margin-top:6px;color:#6a5a40;">© 2026 BibleCharacter.AI. All rights reserved.</div>
 </div>
+  <div class="welcome-overlay" id="welcomeOverlay" style="position:fixed;inset:0;background:rgba(26,22,16,0.82);display:none;align-items:center;justify-content:center;z-index:99999;padding:20px;">
+  <div class="welcome-box" id="welcomeBox" style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:36px 32px 28px;max-width:420px;width:100%;text-align:center;">
+    <div class="welcome-cross" style="font-size:28px;color:var(--gold);margin-bottom:14px;">✦</div>
+    <div class="welcome-divider" style="width:40px;height:2px;background:var(--gold);margin:0 auto 16px;border-radius:2px;"></div>
+    <div class="welcome-title" id="welcomeTitle2" style="font-family:'Pretendard',sans-serif;font-size:18px;font-weight:700;color:var(--ink);margin-bottom:12px;line-height:1.4;"></div>
+    <div class="welcome-body" id="welcomeBody2" style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.9;margin-bottom:24px;"></div>
+    <button class="welcome-btn" id="welcomeBtn2" onclick="closeWelcome()" style="width:100%;background:#B8952A;border:none;border-radius:12px;padding:14px;font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:#2A2318;cursor:pointer;">시작하기</button>
+  </div>
+</div>
 </body>
 </html>
