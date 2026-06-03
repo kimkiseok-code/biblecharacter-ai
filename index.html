@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
   --ink-soft: #8A7A60; --border: rgba(184,149,42,0.25);
 }
 body { background:#1A1610; min-height:100vh; font-family:'Pretendard',sans-serif; margin:0; padding:0; }
-.container { width:100%; max-width:720px; }
+.container { width:100%; max-width:720px; margin:0 auto; }
 
 
 
@@ -704,6 +704,7 @@ textarea:focus { border-color:var(--gold); }
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function(){
 (function(){
   var messages = [
     {title:"오늘 마음이 많이 무거우신가요?", body:"하나님은 성경 속 인물들의 삶을 통해\n오늘 우리에게도 말씀하고 계십니다.\n\n모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로\n당신의 고민에 말씀으로 응답합니다.\n\n인물을 선택하고 지금 마음을 나눠보세요. 🙏", bg:"#FAF6EC", btn:"#B8952A"},
@@ -738,6 +739,7 @@ textarea:focus { border-color:var(--gold); }
   var body = document.getElementById('welcomeBody2');
   if(body) body.innerHTML = m.body.replace(/\n/g,'<br>');
 })();
+});
 </script>
 
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
@@ -1466,7 +1468,7 @@ async function sendMsg(){
   isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
 // 앱 시작
-startApp();
+document.addEventListener('DOMContentLoaded', function() { startApp(); });
 </script>
 
 <!-- 웰컴 모달 -->
