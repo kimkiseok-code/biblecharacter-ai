@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1029,9 +1028,10 @@ let currentChar='', messages=[], isLoading=false;
 
 function startApp(){
   buildCharBars(); initUsage(); updateUserInfo();
-var wo = document.getElementById('welcomeOverlay');
-if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
-window._startAppAfterLogin = startApp;
+  var wo = document.getElementById('welcomeOverlay');
+  if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
+  window._startAppAfterLogin = startApp;
+}
 
 function updateUserInfo(){
   var user = window._currentUser;
@@ -1429,8 +1429,12 @@ async function sendMsg(){
 
   input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
   isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+  if(!window._checkGuestLimit()){
+    removeTyping();
+    isLoading=false; document.getElementById('sendBtn').disabled=false;
+    return;
+  }
   try{
-    if(!window._checkGuestLimit()) return;
     const res=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
