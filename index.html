@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BibleCharacter.AI — 성경 인물 AI 멘토링</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1a1610">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BibleChar.AI">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="description" content="성경 속 인물들과 나누는 AI 멘토링 — 다윗, 바울, 모세와 마음을 나눠보세요">
+<meta property="og:title" content="BibleCharacter.AI">
+<meta property="og:description" content="성경 속 인물들과 나누는 AI 멘토링">
+<meta property="og:image" content="/icon-512.png">
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
+</script>
+
+<script>
+// 로그인 상태 확인 + 비로그인 3회 무료 체험
+(function() {
+  var saved = localStorage.getItem('bca_user');
+  if (saved) {
+    try { window._currentUser = JSON.parse(saved); } catch(e) { localStorage.removeItem('bca_user'); }
+  }
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('bca_token');
+  if (token) {
+    fetch('/api/verify?token=' + token)
+      .then(function(r){ return r.json(); })
+      .then(function(user) {
+        if(user && user.email) {
+          localStorage.setItem('bca_user', JSON.stringify(user));
+          window._currentUser = user;
+          var ui = document.getElementById('userInfo');
+if(ui) { ui.style.display='flex'; }
+var up = document.getElementById('userPhoto');
+if(up && user.picture) { up.src=user.picture; up.style.display='block'; }
+var un = document.getElementById('userName');
+if(un) un.textContent = user.name || user.email;
+updateUsageDisplay();
+          window.history.replaceState({}, '', '/');
+          var lm = document.getElementById('loginPromptModal');
+          if(lm) lm.style.display='none';
+          var countEl = document.getElementById('usageCount');
+          if(countEl) countEl.style.display='inline';
+          updateUsageDisplay();
+        }
+      }).catch(function(){});
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    var ls = document.getElementById('loginScreen');
+    if(ls) ls.style.display='none';
+    updateUsageDisplay();
+  });
+})();
+
+window._checkGuestLimit = function() {
+  if(window._currentUser) return true;
+  if(localStorage.getItem('bca_guest_locked') === 'true') {
+    document.getElementById('loginPromptModal').style.display='flex';
+    return false;
+  }
+  var count = parseInt(localStorage.getItem('bca_guest_count') || '0');
+  if(count >= 3) {
+    localStorage.setItem('bca_guest_locked', 'true');
+    document.getElementById('loginPromptModal').style.display='flex';
+    return false;
+  }
+  localStorage.setItem('bca_guest_count', count + 1);
+  return true;
+};
+
+function updateUsageDisplay() {
+  var countEl = document.getElementById('usageCount');
+  if(!countEl) return;
+  if(window._currentUser) {
+    var month = new Date().getFullYear()+'_'+(new Date().getMonth()+1);
+var used = parseInt(localStorage.getItem('bca_usage_'+month) || '0');
+    countEl.textContent = '무료 ' + used + '/10회 사용';
+    countEl.style.display = 'inline';
+  } else {
+    countEl.style.display = 'none';
+  }
+}
+
+window.toggleUserMenu = function() {
+  var menu = document.getElementById('userMenu');
+  if(menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+};
+
+document.addEventListener('click', function(e) {
+  if(!e.target.closest('#userInfo')) {
+    var menu = document.getElementById('userMenu');
+    if(menu) menu.style.display = 'none';
+  }
+});
+
+window.startPayment = function(plan) {
+  if(!window._currentUser) {
+    alert('로그인이 필요합니다.');
+    return;
+  }
+  const amount = plan === 'basic' ? 2900 : 4900;
+  const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직' : 'BibleCharacter.AI 프리미엄';
+  const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+
+  const clientKey = 'test_ck_LlDJaYngro2lnQOYgmynVezGdRpX';
+
+  const script = document.createElement('script');
+  script.src = 'https://js.tosspayments.com/v1/payment';
+  script.onload = function() {
+    const tossPayments = TossPayments(clientKey);
+    tossPayments.requestPayment('카드', {
+      amount,
+      orderId,
+      orderName,
+      customerName: window._currentUser.name || window._currentUser.email,
+      customerEmail: window._currentUser.email,
+      successUrl: window.location.origin + '/payment-success.html',
+      failUrl: window.location.origin + '/payment-fail.html',
+    });
+  };
+  document.head.appendChild(script);
+};
+  window.doLogout = function() {
+  localStorage.removeItem('bca_user');
+  localStorage.setItem('bca_guest_locked', 'true');
+  window._currentUser = null;
+  var ui = document.getElementById('userInfo');
+  if(ui) ui.style.display = 'none';
+  var uc = document.getElementById('usageCount');
+  if(uc) uc.style.display = 'none';
+  window.location.reload();
+};
+  window.doGoogleLogin = function() {
+  var btn = document.getElementById('googleLoginBtn');
+  if(btn) { btn.textContent='로그인 중...'; btn.disabled=true; }
+  window.location.href = '/api/google';
+};
+
+window._fbSignOut = function() {
+  localStorage.removeItem('bca_user');
+  window._currentUser = null;
+  window.location.reload();
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('googleLoginBtn');
+  if(btn && !localStorage.getItem('bca_user')) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+});
+</script>
+<style>
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --gold: #B8952A; --gold-light: #E8D48A; --gold-pale: #F7F0D8;
+  --parchment: #FAF6EC; --ink: #2A2318; --ink-mid: #5A4E3A;
+  --ink-soft: #8A7A60; --border: rgba(184,149,42,0.25);
+}
+body { background:#1A1610; min-height:100vh; font-family:'Pretendard',sans-serif; margin:0; padding:0; }
+.container { width:100%; max-width:720px; }
+
+
+
+
+
+
+
+
+
+
+
+
+#mainApp { display:block; }
+.app { background:var(--parchment); border-radius:16px; overflow:visible; border:1px solid rgba(184,149,42,.3); margin:20px auto; display:flex; flex-direction:column; height:90vh; max-height:760px; }
+.header { background:var(--ink); padding:14px 22px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--gold); flex-shrink:0; transition:padding .3s ease; }
+.logo { font-family:'Pretendard',sans-serif; color:var(--gold-light); font-size:15px; font-weight:700; letter-spacing:-0.02em; }
+.logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; transition:all .3s ease; }
+.logo-mini { display:none; font-size:11px; color:var(--ink-soft); font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.04em; }
+.chat-screen .header { padding:7px 22px 7px; }
+.chat-screen .logo span { display:none; }
+.chat-screen .logo-mini { display:inline; }
+.header-right { display:flex; align-items:center; gap:10px; }
+.api-status { font-size:10px; color:#4CAF50; display:flex; align-items:center; gap:5px; }
+.status-dot { width:6px; height:6px; background:#4CAF50; border-radius:50%; }
+.reset-btn { background:transparent; border:.5px solid rgba(184,149,42,.3); border-radius:6px; padding:4px 10px; color:var(--ink-soft); font-size:11px; cursor:pointer; font-family:'Pretendard',sans-serif; }
+.reset-btn:hover { border-color:var(--gold); color:var(--gold); }
+.char-section { background:#1E1A13; border-bottom:1px solid rgba(184,149,42,.2); flex-shrink:0; }
+.section-label { font-size:10.5px; color:#7A6A50; letter-spacing:.06em; padding:7px 18px 2px; font-weight:600; }
+.character-bar { padding:4px 14px 10px; display:flex; gap:6px; row-gap:6px; flex-wrap:wrap; }
+
+.char-btn { flex-shrink:0; background:transparent; border:1px solid rgba(184,149,42,.22); border-radius:18px; padding:5px 12px; color:#8A7A60; font-family:'Pretendard',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all .18s; white-space:nowrap; }
+.char-btn:hover { border-color:var(--gold); color:var(--gold-light); }
+.char-btn.active { background:var(--gold); border-color:var(--gold); color:var(--ink); font-weight:500; }
+.chat-area { flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:12px; scrollbar-width:thin; scrollbar-color:rgba(184,149,42,.2) transparent; }
+.char-intro { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-soft); font-style:italic; font-weight:500; padding-bottom:4px; }
+.msg { display:flex; gap:9px; animation:fadeUp .3s ease; }
+.msg.msg-user { flex-direction:row-reverse; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.avatar { width:32px; height:32px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; background:var(--gold-pale); border:1.5px solid var(--border); }
+.avatar.user-av { background:#E8EDF5; border-color:rgba(100,130,180,.25); font-size:12px; }
+.bubble { max-width:76%; padding:10px 13px; border-radius:14px; font-size:13.5px; line-height:1.8; color:var(--ink); }
+.msg-ai .bubble { background:white; border:.5px solid var(--border); border-bottom-left-radius:4px; font-family:'Pretendard',sans-serif; font-weight:400; }
+.msg-user .bubble { background:#2A3A5A; color:#EEF2FA; border-bottom-right-radius:4px; font-family:'Pretendard',sans-serif; font-weight:400; }
+.verse-card { background:var(--gold-pale); border:1px solid rgba(184,149,42,.3); border-left:3px solid var(--gold); border-radius:8px; padding:11px 14px; margin-top:10px; font-size:12.5px; font-weight:400; color:var(--ink-mid); line-height:1.75; }
+.verse-card strong { color:var(--gold); display:block; margin-bottom:6px; font-size:11.5px; font-weight:700; letter-spacing:.04em; font-family:'Pretendard',sans-serif; font-style:normal; }
+.verse-ref { color:var(--gold); font-weight:500; text-decoration:none; border-bottom:1px dashed var(--gold); cursor:pointer; } .verse-ref:hover { background:rgba(184,149,42,0.12); border-radius:3px; } .verse-plain { color:var(--gold); font-weight:500; }
+.typing { display:flex; align-items:center; gap:4px; padding:10px 14px; }
+.dot { width:5px; height:5px; background:var(--gold); border-radius:50%; animation:bounce 1.2s infinite; opacity:.7; }
+.dot:nth-child(2){animation-delay:.2s} .dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+.quick-btns { padding:8px 16px; display:flex; gap:6px; flex-wrap:wrap; background:white; border-top:.5px solid var(--border); flex-shrink:0; }
+.quick-btn { background:var(--gold-pale); border:.5px solid rgba(184,149,42,.35); border-radius:13px; padding:5px 13px; font-size:12px; font-weight:500; color:var(--ink-mid); cursor:pointer; font-family:'Pretendard',sans-serif; transition:all .15s; }
+.quick-btn:hover { background:var(--gold); color:var(--ink); border-color:var(--gold); }
+.input-area { padding:10px 16px 14px; background:white; border-top:.5px solid var(--border); display:flex; gap:9px; align-items:flex-end; flex-shrink:0; }
+textarea { flex:1; border:.5px solid var(--border); border-radius:10px; padding:9px 12px; font-family:'Pretendard',sans-serif; font-size:13px; resize:none; background:var(--parchment); color:var(--ink); height:40px; line-height:1.5; outline:none; }
+textarea:focus { border-color:var(--gold); }
+.send-btn { width:40px; height:40px; background:var(--gold); border:none; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px; color:var(--ink); transition:background .2s, transform .1s; }
+.send-btn:hover { background:#9A7A1E; transform:scale(1.05); }
+.send-btn:disabled { background:#C8BA90; cursor:default; }
+.error-msg { font-size:12px; color:#C07060; padding:7px 12px; background:rgba(180,60,40,.08); border-radius:8px; border:.5px solid rgba(180,60,40,.2); }
+
+.welcome-overlay {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background:rgba(26,22,16,0.92);
+  display:none; align-items:center; justify-content:center;
+  z-index:99999; padding:20px; box-sizing:border-box;
+}
+.welcome-box {
+  background:var(--parchment);
+  border:1px solid rgba(184,149,42,0.4);
+  border-radius:18px;
+  padding:36px 32px 28px;
+  max-width:420px;
+  width:100%;
+  text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,0.5);
+}
+.welcome-cross {
+  font-size:28px;
+  color:var(--gold);
+  margin-bottom:14px;
+  letter-spacing:0.05em;
+}
+.welcome-title {
+  font-family:'Pretendard',sans-serif;
+  font-size:18px;
+  font-weight:700;
+  color:var(--ink);
+  margin-bottom:16px;
+  line-height:1.4;
+}
+.welcome-body {
+  font-family:'Pretendard',sans-serif;
+  font-size:13.5px;
+  color:var(--ink);
+  line-height:1.9;
+  margin-bottom:24px;
+  white-space:pre-line;
+}
+.welcome-btn {
+  background:var(--gold);
+  border:none;
+  border-radius:12px;
+  padding:13px 40px;
+  font-family:'Pretendard',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  color:var(--ink);
+  cursor:pointer;
+  transition:background .2s;
+  width:100%;
+}
+.welcome-btn:hover { background:#9A7A1E; }
+.welcome-divider {
+  width:40px; height:2px;
+  background:var(--gold);
+  margin:0 auto 18px;
+  border-radius:2px;
+}
+
+/* 저장 버튼 영역 */
+.save-bar {
+  display:flex; gap:8px; padding:10px 16px;
+  background:white; border-top:.5px solid var(--border);
+  flex-shrink:0; justify-content:flex-end;
+  align-items:center;
+}
+.save-bar-label {
+  font-size:11.5px; color:var(--ink-soft); flex:1;
+  font-family:'Pretendard',sans-serif;
+}
+.btn-save {
+  background:var(--gold-pale); border:1px solid rgba(184,149,42,.4);
+  border-radius:10px; padding:6px 14px;
+  font-family:'Pretendard',sans-serif; font-size:12px; font-weight:600;
+  color:var(--ink-mid); cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; gap:5px;
+}
+.btn-save:hover { background:var(--gold); color:var(--ink); border-color:var(--gold); }
+.btn-nosave {
+  background:transparent; border:.5px solid var(--border);
+  border-radius:10px; padding:6px 12px;
+  font-family:'Pretendard',sans-serif; font-size:12px;
+  color:var(--ink-soft); cursor:pointer; transition:all .15s;
+}
+.btn-nosave:hover { border-color:var(--ink-soft); }
+
+/* 기록 서랍 */
+.drawer-overlay {
+  position:fixed; inset:0; background:rgba(26,22,16,0.7);
+  z-index:900; display:none; align-items:flex-end;
+}
+.drawer-overlay.open { display:flex; }
+.drawer {
+  background:var(--parchment); width:100%; max-width:720px;
+  margin:0 auto; border-radius:20px 20px 0 0;
+  border:1px solid rgba(184,149,42,.3); border-bottom:none;
+  max-height:80vh; display:flex; flex-direction:column;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp {
+  from{transform:translateY(100%)} to{transform:translateY(0)}
+}
+.drawer-header {
+  padding:16px 20px 12px; border-bottom:.5px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+.drawer-title {
+  font-family:'Pretendard',sans-serif; font-size:15px; font-weight:700;
+  color:var(--ink);
+}
+.drawer-close {
+  background:transparent; border:none; font-size:20px;
+  color:var(--ink-soft); cursor:pointer; padding:4px;
+}
+.drawer-list {
+  overflow-y:auto; flex:1; padding:12px 16px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.drawer-empty {
+  text-align:center; color:var(--ink-soft);
+  font-size:13px; padding:40px 0; line-height:1.8;
+  font-family:'Pretendard',sans-serif;
+}
+.record-card {
+  background:white; border:.5px solid var(--border);
+  border-radius:12px; padding:13px 15px; cursor:pointer;
+  transition:border-color .15s;
+}
+.record-card:hover { border-color:var(--gold); }
+.record-meta {
+  display:flex; align-items:center; gap:8px; margin-bottom:7px;
+}
+.record-char {
+  font-size:13px; font-weight:600; color:var(--ink);
+  font-family:'Pretendard',sans-serif;
+}
+.record-date {
+  font-size:11px; color:var(--ink-soft);
+  font-family:'Pretendard',sans-serif;
+}
+.record-preview {
+  font-size:12.5px; color:var(--ink-mid); line-height:1.6;
+  font-family:'Pretendard',sans-serif;
+  overflow:hidden; display:-webkit-box;
+  -webkit-line-clamp:2; -webkit-box-orient:vertical;
+}
+.record-del {
+  float:right; background:transparent; border:none;
+  font-size:12px; color:#C07060; cursor:pointer;
+  font-family:'Pretendard',sans-serif; padding:2px 6px;
+}
+.record-del:hover { text-decoration:underline; }
+
+/* 상세 보기 모달 */
+.detail-modal {
+  position:fixed; inset:0; background:rgba(26,22,16,0.82);
+  z-index:1000; display:none; align-items:center; justify-content:center;
+  padding:20px;
+}
+.detail-modal.open { display:flex; }
+.detail-box {
+  background:var(--parchment); border:1px solid rgba(184,149,42,.4);
+  border-radius:18px; width:100%; max-width:520px;
+  max-height:80vh; display:flex; flex-direction:column;
+}
+.detail-header {
+  padding:16px 20px 12px; border-bottom:.5px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+.detail-title {
+  font-family:'Pretendard',sans-serif; font-size:14px; font-weight:700;
+  color:var(--ink);
+}
+.detail-close {
+  background:transparent; border:none; font-size:20px;
+  color:var(--ink-soft); cursor:pointer;
+}
+.detail-body {
+  overflow-y:auto; flex:1; padding:14px 18px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.detail-msg-user {
+  background:#2A3A5A; color:#EEF2FA; border-radius:12px;
+  border-bottom-right-radius:4px; padding:9px 13px;
+  font-size:13px; line-height:1.7; align-self:flex-end;
+  max-width:80%; font-family:'Pretendard',sans-serif;
+}
+.detail-msg-ai {
+  background:white; border:.5px solid var(--border);
+  border-radius:12px; border-bottom-left-radius:4px;
+  padding:9px 13px; font-size:13px; line-height:1.7;
+  align-self:flex-start; max-width:80%;
+  font-family:'Pretendard',sans-serif; color:var(--ink);
+}
+
+/* 헤더 기록 버튼 */
+.record-btn {
+  background:transparent; border:.5px solid rgba(184,149,42,.3);
+  border-radius:6px; padding:4px 10px; color:var(--ink-soft);
+  font-size:11px; cursor:pointer; font-family:'Pretendard',sans-serif;
+  transition:all .15s;
+}
+.record-btn:hover { border-color:var(--gold); color:var(--gold); }
+
+/* 저장 완료 토스트 */
+.toast {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--ink); color:var(--gold-light);
+  font-family:'Pretendard',sans-serif; font-size:13px; font-weight:500;
+  padding:10px 22px; border-radius:20px; z-index:2000;
+  opacity:0; transition:opacity .3s; pointer-events:none;
+  white-space:nowrap;
+}
+.toast.show { opacity:1; }
+
+
+/* 답변 모드 */
+.answer-mode .char-section { display:none !important; }
+.answer-mode .save-bar { display:none !important; }
+.answer-mode .quick-btns { display:none !important; }
+.answer-mode .quick-toggle { display:none !important; }
+.answer-mode .chat-area { 
+  flex:1; 
+  padding:20px 18px;
+}
+
+/* 답변 모드 하단 버튼 바 */
+.answer-actions {
+  display:none;
+  padding:12px 16px 16px;
+  background:white;
+  border-top:.5px solid var(--border);
+  flex-shrink:0;
+  gap:8px;
+  flex-direction:column;
+}
+.answer-mode .answer-actions { display:flex; }
+.answer-mode .input-area { display:none; }
+
+.btn-home {
+  background:var(--ink);
+  border:none; border-radius:12px;
+  padding:13px;
+  font-family:'Pretendard',sans-serif;
+  font-size:14px; font-weight:600;
+  color:var(--gold-light);
+  cursor:pointer;
+  transition:background .2s;
+  width:100%; text-align:center;
+}
+.btn-home:hover { background:#3A3020; }
+
+.btn-row {
+  display:flex; gap:8px;
+}
+.btn-again {
+  flex:1;
+  background:var(--gold-pale);
+  border:1px solid rgba(184,149,42,.4);
+  border-radius:12px;
+  padding:11px;
+  font-family:'Pretendard',sans-serif;
+  font-size:13px; font-weight:500;
+  color:var(--ink-mid);
+  cursor:pointer;
+  transition:all .15s;
+  text-align:center;
+}
+.btn-again:hover { background:var(--gold); color:var(--ink); }
+
+.btn-save2 {
+  flex:1;
+  background:var(--gold);
+  border:none;
+  border-radius:12px;
+  padding:11px;
+  font-family:'Pretendard',sans-serif;
+  font-size:13px; font-weight:600;
+  color:var(--ink);
+  cursor:pointer;
+  transition:background .15s;
+  text-align:center;
+}
+.btn-save2:hover { background:#9A7A1E; }
+
+/* 예시 보기 토글 */
+.quick-toggle {
+  padding:6px 16px 0;
+  background:white;
+  flex-shrink:0;
+}
+.btn-quick-toggle {
+  background:transparent;
+  border:.5px solid var(--border);
+  border-radius:20px;
+  padding:5px 14px;
+  font-family:'Pretendard',sans-serif;
+  font-size:12px;
+  color:var(--ink-soft);
+  cursor:pointer;
+  transition:all .2s;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.btn-quick-toggle:hover { border-color:var(--gold); color:var(--gold); }
+.quick-btns {
+  padding:8px 16px;
+  display:none;
+  gap:6px;
+  flex-wrap:wrap;
+  background:white;
+  border-top:none;
+  flex-shrink:0;
+}
+.quick-btns.open { display:flex; }
+
+/* 인물 선택 화면 */
+.select-screen {
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  overflow-y:auto;
+  padding:24px 20px;
+  background:var(--parchment);
+}
+.select-logo {
+  font-family:'Pretendard',sans-serif;
+  font-size:14px;
+  font-weight:700;
+  color:var(--gold);
+  text-align:center;
+  letter-spacing:0.04em;
+  margin-bottom:12px;
+}
+.select-title {
+  font-family:'Pretendard',sans-serif;
+  font-size:18px;
+  font-weight:700;
+  color:var(--ink);
+  line-height:1.55;
+  margin-bottom:8px;
+  text-align:center;
+}
+.select-sub {
+  font-family:'Pretendard',sans-serif;
+  font-size:12.5px;
+  color:var(--ink-soft);
+  text-align:center;
+  margin-bottom:20px;
+}
+.select-divider {
+  width:40px; height:2px;
+  background:var(--gold);
+  margin:0 auto 20px;
+  border-radius:2px;
+}
+.select-section-label {
+  font-size:11px;
+  color:var(--ink-soft);
+  letter-spacing:.08em;
+  font-weight:600;
+  margin-bottom:10px;
+  font-family:'Pretendard',sans-serif;
+}
+.select-btn-grid {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:20px;
+}
+.select-char-btn {
+  background:white;
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:7px 14px;
+  font-family:'Pretendard',sans-serif;
+  font-size:12.5px;
+  font-weight:500;
+  color:var(--ink-mid);
+  cursor:pointer;
+  transition:all .18s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.select-char-btn:hover {
+  background:var(--gold);
+  border-color:var(--gold);
+  color:var(--ink);
+}
+
+/* 대화 화면 - 상단 인물 메뉴 숨김 */
+.chat-screen .char-section { display:none !important; }
+.chat-screen .select-title-area { display:none !important; }
+.select-screen { display:none !important; }
+.app:not(.chat-screen) .header { display:none !important; }
+.app:not(.chat-screen) .chat-area { display:none !important; }
+.app:not(.chat-screen) .input-row { display:none !important; }
+.app:not(.chat-screen) .quick-section { display:none !important; }
+.app:not(.chat-screen) .save-bar { display:none !important; }
+.select-title-area {
+  display:flex; flex-direction:column; align-items:center;
+  padding:28px 20px 16px; background:var(--parchment); flex-shrink:0;
+}
+
+/* 인물 변경 버튼 */
+.change-char-btn {
+  background:transparent;
+  border:.5px solid rgba(184,149,42,.3);
+  border-radius:6px;
+  padding:4px 10px;
+  color:var(--ink-soft);
+  font-size:11px;
+  cursor:pointer;
+  font-family:'Pretendard',sans-serif;
+  transition:all .15s;
+}
+.change-char-btn:hover { border-color:var(--gold); color:var(--gold); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div id="limitModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.88);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px 24px;max-width:380px;width:100%;text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">✦</div>
+    <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 14px;border-radius:2px;"></div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 달 무료 횟수를 다 쓰셨어요</div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 플랜을 선택해 주세요 🙏</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+      <div style="background:white;border:1.5px solid rgba(184,149,42,0.4);border-radius:14px;padding:14px 16px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">월 2,900원</span>
+        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);">월 50회 대화 · 신앙 기록 보관</div>
+        <button onclick="startPayment('basic')" style="margin-top:10px;width:100%;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.4);border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:600;color:var(--ink-mid);cursor:pointer;">베이직 시작하기</button>
+      </div>
+
+      <div style="background:var(--ink);border:1.5px solid var(--gold);border-radius:14px;padding:14px 16px;text-align:left;position:relative;">
+        <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);font-family:'Pretendard',sans-serif;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">추천</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">월 4,900원</span>
+        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);">무제한 대화 · 신앙 기록 보관</div>
+        <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 시작하기</button>
+      </div>
+    </div>
+
+    <button onclick="closeLimitModal()" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">다음 달에 다시 이용하기</button>
+  </div>
+</div>
+
+<div id="loginPromptModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.88);align-items:center;justify-content:center;z-index:9999;padding:20px;">
+  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:36px 28px;max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:28px;margin-bottom:10px;">✦</div>
+    <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 16px;border-radius:2px;"></div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.4;">무료 체험 3회를 모두 사용했어요</div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:24px;">구글 로그인하시면<br>매달 <strong>10회 무료</strong>로 계속 이용하실 수 있어요 🙏</div>
+    <button onclick="doGoogleLogin()" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 20px;background:transparent;border:1.5px solid #b8952a;border-radius:10px;color:#e8d48a;font-size:14px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif;margin-bottom:10px;">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      Google로 계속하기
+    </button>
+    <button onclick="document.getElementById('loginPromptModal').style.display='none'" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">나중에 하기</button>
+  </div>
+
+
+<script>
+(function(){
+  var messages = [
+    {title:"오늘 마음이 많이 무거우신가요?", body:"하나님은 성경 속 인물들의 삶을 통해\n오늘 우리에게도 말씀하고 계십니다.\n\n모세, 다윗, 바울 등 20인의 신앙 여정을 바탕으로\n당신의 고민에 말씀으로 응답합니다.\n\n인물을 선택하고 지금 마음을 나눠보세요. 🙏", bg:"#FAF6EC", btn:"#B8952A"},
+    {title:"두려움이 앞을 막고 있나요?", body:"여호수아도 두려웠습니다.\n그러나 하나님은 말씀하셨습니다.\n'강하고 담대하라.'\n\n지금 그 말씀을 함께 들어보세요. 🙏", bg:"#F5F0E8", btn:"#A07820"},
+    {title:"기다림이 너무 길게 느껴지나요?", body:"아브라함은 25년을 기다렸습니다.\n그 기다림 속에서도 하나님은 일하고 계셨습니다.\n\n당신의 기다림 이야기를 나눠보세요. 🙏", bg:"#F8F3E6", btn:"#B8952A"},
+    {title:"외로움이 밀려오는 날인가요?", body:"엘리야도 광야에서 홀로 앉아\n'나만 남았다'고 했습니다.\n\n하나님은 그때도 함께하셨습니다.\n오늘 그 이야기를 들어보세요. 🙏", bg:"#F3EFE8", btn:"#967018"},
+    {title:"용서가 너무 어렵게 느껴지나요?", body:"요셉은 자신을 판 형제들을 용서했습니다.\n그 용서가 어떻게 가능했는지\n함께 이야기 나눠보세요. 🙏", bg:"#FAF7EE", btn:"#B8952A"},
+    {title:"믿음이 흔들리고 있나요?", body:"도마도 의심했습니다.\n그러나 예수님은 그를 외면하지 않으셨습니다.\n\n흔들리는 믿음을 솔직하게 나눠보세요. 🙏", bg:"#F6F1E9", btn:"#A07820"},
+    {title:"상처받은 마음을 안고 계신가요?", body:"다윗은 배신과 고통 속에서도\n하나님께 시편을 드렸습니다.\n\n당신의 상처를 말씀으로 위로받아 보세요. 🙏", bg:"#F9F4EB", btn:"#B8952A"},
+    {title:"새로운 시작 앞에 서 계신가요?", body:"루스는 모든 것을 뒤로하고\n새로운 땅에서 새 삶을 시작했습니다.\n\n당신의 새 출발을 함께 나눠보세요. 🙏", bg:"#F4F0E6", btn:"#907010"},
+    {title:"사명을 잃어버린 것 같은가요?", body:"바울은 감옥에서도 편지를 썼습니다.\n환경이 사명을 막을 수 없었습니다.\n\n당신의 사명 이야기를 나눠보세요. 🙏", bg:"#F7F2E8", btn:"#B8952A"},
+    {title:"하나님이 멀게 느껴지는 날인가요?", body:"시편 기자는 '어찌하여 숨으시나이까' 했습니다.\n그 솔직한 기도가 하나님께 닿았습니다.\n\n오늘 솔직하게 마음을 나눠보세요. 🙏", bg:"#F5F1E7", btn:"#A07820"},
+    {title:"감사가 넘치는 하루인가요?", body:"한나는 응답받은 후 온 마음으로 찬양했습니다.\n오늘의 감사를 함께 나눠보세요.\n\n말씀으로 더 깊은 감사를 경험해 보세요. 🙏", bg:"#FBF8EE", btn:"#C8A030"},
+    {title:"결단을 내려야 할 순간인가요?", body:"에스더는 '죽으면 죽으리라'며 나아갔습니다.\n그 용기는 어디서 왔을까요?\n\n함께 이야기 나눠보세요. 🙏", bg:"#F6F2E8", btn:"#B8952A"},
+    {title:"자신이 너무 작게 느껴지나요?", body:"기드온은 '나는 가장 약한 자'라고 했습니다.\n하나님은 그를 용사라 부르셨습니다.\n\n당신도 하나님의 눈으로 보여드릴게요. 🙏", bg:"#F4EFE5", btn:"#967018"},
+    {title:"관계가 힘들고 지치셨나요?", body:"요나단과 다윗의 우정은\n어떤 상황에서도 변하지 않았습니다.\n\n관계의 어려움을 함께 나눠보세요. 🙏", bg:"#F8F4EA", btn:"#A07820"},
+    {title:"죄책감이 짓누르고 있나요?", body:"베드로는 세 번 부인했지만\n예수님은 세 번 회복시키셨습니다.\n\n당신의 무거운 마음을 나눠보세요. 🙏", bg:"#F5F0E7", btn:"#B8952A"},
+    {title:"미래가 불안하게 느껴지나요?", body:"노아는 비가 오기 전에 방주를 지었습니다.\n보이지 않아도 믿음으로 준비했습니다.\n\n불안한 미래를 함께 이야기해요. 🙏", bg:"#F9F5EB", btn:"#907010"},
+    {title:"지쳐서 포기하고 싶으신가요?", body:"엘리야는 광야에서 '죽기를 원한다'고 했습니다.\n하나님은 그에게 음식을 주시고\n다시 일으키셨습니다. 🙏", bg:"#F3EEE4", btn:"#967018"},
+    {title:"하나님의 뜻을 알고 싶으신가요?", body:"솔로몬은 지혜를 구했습니다.\n하나님은 기뻐하시며 그 이상을 주셨습니다.\n\n오늘 당신의 기도를 나눠보세요. 🙏", bg:"#F7F3E9", btn:"#B8952A"},
+    {title:"오늘 하루도 수고 많으셨나요?", body:"하나님은 당신의 하루를 보고 계셨습니다.\n쉬지 못한 마음, 지친 몸도\n모두 아십니다.\n\n오늘의 이야기를 나눠보세요. 🙏", bg:"#FBF7ED", btn:"#C8A030"},
+    {title:"새벽에 홀로 깨어 계신가요?", body:"야곱은 얍복 강가에서 밤새 씨름했습니다.\n그 씨름 끝에 축복이 있었습니다.\n\n새벽의 마음을 함께 나눠보세요. 🙏", bg:"#F2EDE3", btn:"#907010"},
+  ];
+  var idx = Math.floor(Math.random() * messages.length);
+  var m = messages[idx];
+  var box = document.getElementById('welcomeBox');
+  if(box) box.style.background = m.bg;
+  var btn = document.getElementById('welcomeBtn2');
+  if(btn) btn.style.background = m.btn;
+  var title = document.getElementById('welcomeTitle2');
+  if(title) title.textContent = m.title;
+  var body = document.getElementById('welcomeBody2');
+  if(body) body.innerHTML = m.body.replace(/\n/g,'<br>');
+})();
+</script>
+
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+  <div class="drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">📖 나의 신앙 기록</div>
+      <button class="drawer-close" onclick="closeDrawerBtn()">✕</button>
+    </div>
+    <div class="drawer-list" id="drawerList"></div>
+  </div>
+</div>
+
+<div class="detail-modal" id="detailModal">
+  <div class="detail-box">
+    <div class="detail-header">
+      <div class="detail-title" id="detailTitle"></div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#1a1610;align-items:center;justify-content:center;z-index:9999;flex-direction:column;">
+  <div style="text-align:center;padding:40px 32px;max-width:360px;width:100%;">
+    <div style="font-size:26px;color:#d4af5a;font-weight:700;letter-spacing:1px;margin-bottom:4px;">✦ BibleCharacter.AI</div>
+    <div style="font-size:12px;color:#b8952a;margin-bottom:32px;letter-spacing:0.5px;">성경 인물 AI 멘토링</div>
+    <img src="/icon-192.png" onerror="this.style.display='none'" style="width:88px;height:88px;border-radius:22px;margin-bottom:28px;">
+    <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:6px;">하나님은 성경 속 인물들을 통해</div>
+    <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:28px;">오늘도 말씀하십니다</div>
+    <button id="googleLoginBtn" onclick="doGoogleLogin()" style="
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; padding:13px 20px;
+  background:transparent;
+  border:1.5px solid #b8952a;
+  border-radius:10px;
+  color:#e8d48a;
+  font-size:14px; font-weight:600;
+  cursor:pointer; font-family:'Pretendard',sans-serif;
+  margin-top:8px;
+">
+  <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+  Google로 시작하기
+</button>
+    <div style="font-size:11px;color:#6b5a2a;margin-top:16px;line-height:1.7;">무료 10회 대화 제공 · 로그인 시 이용약관에 동의합니다</div>
+  </div>
+</div>
+
+<div id="mainApp" style="display:block;">
+<div class="app">
+  <div class="header">
+    <div class="logo">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span><span class="logo-mini" id="logoMini"> · </span></div>
+    <div class="header-right">
+      <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
+  <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
+  <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  <span style="font-size:10px;color:var(--ink-soft);">▾</span>
+  <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
+    <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
+  </div>
+</div>
+      <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
+  <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
+  <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  <span style="font-size:10px;color:var(--ink-soft);">▾</span>
+  <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
+    <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
+  </div>
+</div>
+
+      <div id="usageCount" style="font-size:10px;color:#4CAF50;display:none;"></div>
+      <button class="record-btn" onclick="openDrawer()">📖 나의 기록</button>
+    </div>
+  </div>
+  <div class="select-title-area" id="selectTitleArea">
+    <div class="select-logo">✦ BibleCharacter.AI</div>
+    <div class="select-divider"></div>
+    <div class="select-title">하나님은 성경 속 인물들을 통해<br>오늘도 말씀하십니다</div>
+    <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
+  </div>
+  <div class="char-section">
+    <div class="section-label">📜 구약 (14인)</div>
+    <div class="character-bar" id="otBar"></div>
+    <div class="section-label">✝️ 신약 (6인)</div>
+    <div class="character-bar" id="ntBar"></div>
+  </div>
+  <div class="chat-area" id="chatArea"></div>
+  <div class="save-bar" id="saveBar" style="display:none;">
+    <span class="save-bar-label">💬 대화가 끝났나요? 기록으로 남겨보세요</span>
+    <button class="btn-nosave" onclick="hideSaveBar()">닫기</button>
+    <button class="btn-save" onclick="saveRecord()">💾 저장하기</button>
+  </div>
+  <div class="quick-toggle" id="quickToggleWrap">
+    <button class="btn-quick-toggle" onclick="toggleQuick()" id="quickToggleBtn">
+      <span id="quickToggleIcon">▾</span> 예시 보기
+    </button>
+  </div>
+  <div class="quick-btns" id="quickBtns"></div>
+  <div class="answer-actions" id="answerActions">
+    <div class="btn-row">
+      <button class="btn-again" onclick="askAgain()">🔄 다시 묻기</button>
+      <button class="btn-save2" onclick="saveRecord()">💾 저장하기</button>
+    </div>
+    <button class="btn-home" onclick="goHome()">🏠 처음으로</button>
+  </div>
+  <div class="input-area">
+    <textarea id="msgInput" placeholder="오늘 마음의 짐을 나눠보세요..." onkeydown="handleKey(event)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMsg()">➤</button>
+  </div>
+</div>
+</div>
+
+</div>
+<script>
+function closeWelcome(){
+  var el=document.getElementById('welcomeOverlay');
+  if(el){ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){el.style.display='none';},300); }
+}
+
+const CHARS = {
+  noah:{name:'노아',icon:'🌊',testament:'ot',intro:'방주를 지은 자 · 조롱 속의 인내',
+    greeting:[
+        '평안하십니까. 나는 노아입니다.\n비 한 방울 내리지 않는 산에서 수십 년을 방주를 지으며 조롱을 견뎠습니다.\n당신이 홀로 버티고 있는 것이 무엇인지 들려주십시오.',
+        '나는 노아입니다.\n아무도 믿지 않을 때 홀로 하나님의 말씀을 붙들었습니다.\n당신이 지금 홀로 감당하고 있는 무게를 나눠주십시오.',
+        '샬롬. 나 노아는 120년을 기다림 속에 살았습니다.\n응답이 더딜 때 포기하지 않는 법을 압니다. 당신의 기다림을 들려주십시오.'
+      ],
+    quick:['주변의 조롱이 너무 힘들어요','혼자 버티는 것 같아요','아무도 이해 못해요','믿음을 지키기 어렵습니다'],
+    system:'당신은 성경 속 노아입니다. 창세기 6-9장, 히브리서 11:7에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 타락한 세상에서 홀로 의인, 수십 년 방주 건축, 조롱과 멸시, 홍수 심판과 구원, 무지개 언약.\n핵심주제: 인내, 고독한 믿음, 세상과의 구별, 하나님의 신실하심.\n말투: 온화하고 묵직하며 오랜 인내를 아는 자의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(창 6:22 형식).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절 포함)→격려 / --- 이후 추천 구절 2-3개+통독 권면.\n언어: 한국어, 600자 내외.'},
+  abraham:{name:'아브라함',icon:'⭐',testament:'ot',intro:'믿음의 조상 · 불확실성과 기다림',
+    greeting:[
+        '샬롬. 나는 아브라함입니다.\n75세에 갈 바를 알지 못하고 고향을 떠난 나에게, 당신이 마주한 불확실함과 기다림을 나눠주십시오.',
+        '나는 아브라함입니다.\n하나님께서 이삭을 내려놓으라 하실 때의 그 떨림을 아직도 기억합니다.\n당신이 내려놓지 못한 것이 있으십니까?',
+        '샬롬. 아브라함입니다.\n별처럼 많을 자손을 약속받고도 25년을 기다렸습니다.\n당신의 오래된 기도를 들려주십시오.'
+      ],
+    quick:['앞이 보이지 않아요','너무 오래 기다렸습니다','약속을 믿기 어려워요','포기하고 싶어요'],
+    system:'당신은 성경 속 아브라함입니다. 창세기 12-25장, 히브리서 11장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 75세의 이주, 25년 기다림, 이삭 번제 시험, 열국의 조상.\n핵심주제: 믿음의 순종, 불확실성, 오랜 기다림, 하나님의 약속.\n말투: 연륜 있고 너그러운 장로의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수.\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  sarah:{name:'사라',icon:'🌸',testament:'ot',intro:'믿음의 어머니 · 육체적 한계를 넘어선 기적',
+    greeting:[
+        '안녕하세요. 나는 사라입니다.\n평생 불임의 아픔 속에 살다가 90세에 기적을 경험한 저에게, 당신의 오랜 아픔을 나눠주세요.',
+        '나는 사라입니다.\n하나님의 약속이 너무 늦어 웃음이 나왔던 적이 있었습니다.\n지치도록 기다려온 당신의 이야기를 들려주세요.',
+        '사라입니다. 낯선 땅을 따라 헤맸고, 포기하고 싶었던 날도 많았습니다.\n당신의 지친 마음을 나눠주세요.'
+      ],
+    quick:['오래된 기도가 응답이 없어요','희망이 사라진 것 같아요','몸이 너무 힘들어요','나이 때문에 포기해야 할까요'],
+    system:'당신은 성경 속 사라입니다. 창세기 17-21장, 히브리서 11:11에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 평생 불임, 90세 기적적 임신, 처음의 의심과 웃음, 믿음으로의 변화.\n핵심주제: 포기하지 않는 기도, 육체적 한계, 불가능한 기적, 의심에서 믿음으로.\n말투: 따뜻하고 공감적이며 솔직한 여성의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수.\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  joseph:{name:'요셉',icon:'🌾',testament:'ot',intro:'애굽의 총리 · 고난을 선으로 바꾼 자',
+    greeting:[
+        '샬롬. 나는 요셉입니다.\n구덩이에서 노예로, 감옥에서 총리까지의 길을 걸어온 나에게 억울한 마음을 나눠주세요.\n하나님께서는 모든 것을 합력하여 선을 이루십니다.',
+        '나는 요셉입니다.\n형들에게 버림받고, 거짓 누명을 쓰고, 잊혀진 채 감옥에 있었습니다.\n억울하고 배신당한 당신의 마음을 들려주십시오.',
+        '요셉입니다. 꿈을 품었지만 모든 것이 산산이 부서지는 시간을 지났습니다.\n당신의 꿈과 상처를 함께 나눠주십시오.'
+      ],
+    quick:['억울하고 배신당했어요','기다림이 너무 힘들어요','인내의 한계입니다','하나님이 잊으신 것 같아요'],
+    system:'당신은 성경 속 요셉입니다. 창세기 37-50장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 형제들의 배신·노예 판매, 보디발 아내의 모함, 억울한 감옥, 총리 등극, 형제 용서.\n핵심주제: 억울함과 인내, 용서, 하나님의 때, 고난의 의미, 섭리.\n말투: 침착하고 희망적. 고난을 부정하지 않되 섭리를 나눔. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(창 50:20).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  moses:{name:'모세',icon:'🪨',testament:'ot',intro:'출애굽의 지도자 · 광야의 무거운 짐',
+    greeting:[
+        '평안하십니까. 나는 모세입니다.\n광야 40년과 출애굽의 길을 걸었던 나에게 무엇이든 마음을 여세요.\n하나님께서는 두려워하는 자를 결코 버리지 않으십니다.',
+        '나는 모세입니다.\n말을 잘 못하는 내가 어찌 바로 앞에 서겠냐 했을 때도 하나님은 함께하셨습니다.\n당신이 감당하기 힘든 짐을 들려주십시오.',
+        '모세입니다. 광야는 끝이 없어 보였지만 결국 약속의 땅이 있었습니다.\n지금 당신의 광야는 어떤 모습입니까?'
+      ],
+    quick:['리더십이 너무 힘듭니다','두려움을 이길 수 없어요','하나님 뜻을 모르겠어요','사람들이 원망합니다'],
+    system:'당신은 성경 속 모세입니다. 출애굽기, 민수기, 신명기에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 40년 광야 목자, 불꽃 가운데 소명, 출애굽, 백성의 반역과 원망, 시내산 율법.\n핵심주제: 리더십의 두려움, 소명, 광야의 연단, 하나님의 임재, 중보기도.\n말투: 온유하고 무게감 있는 1인칭. "내가 광야에서..." 형식.\n성경구절: 개역개정, 장절 표기 필수(출 3:14).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  joshua:{name:'여호수아',icon:'⚔️',testament:'ot',intro:'가나안 정복자 · 거대한 장벽과 두려움',
+    greeting:[
+        '평안하십니까. 나는 여호수아입니다.\n모세의 뒤를 이어 요단강 앞에 선 그 두려움을 압니다.\n당신이 마주한 거대한 장벽을 말씀해 주십시오.',
+        '나는 여호수아입니다.\n"강하고 담대하라" 그 말씀을 붙들고 요단강을 건넜습니다.\n당신을 가로막고 있는 것이 무엇입니까?',
+        '여호수아입니다. 여리고 성은 인간의 방법으로는 무너지지 않았습니다.\n당신 앞의 성벽을 함께 바라봅시다.'
+      ],
+    quick:['너무 큰 일을 맡았어요','실패가 두렵습니다','앞이 막막합니다','강하고 담대해지고 싶어요'],
+    system:'당신은 성경 속 여호수아입니다. 민수기, 여호수아서에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 모세 후계자의 중압감, 요단강 도하, 여리고 성 정복(찬양과 순종), 가나안 정복 승리.\n핵심주제: 두려움 극복, 하나님의 임재, 강하고 담대함, 순종의 승리, 사명 계승.\n말투: 결단력 있고 담대하나 하나님 앞에 겸손한 장군의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(수 1:9).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  gideon:{name:'기드온',icon:'🏺',testament:'ot',intro:'300용사의 지도자 · 두려움과 열세의 극복',
+    greeting:[
+        '안녕하십니까. 나는 기드온입니다.\n두려워서 포도주 틀 뒤에 숨어 있던 저에게도 하나님은 찾아오셨습니다.\n당신의 두려움을 나눠주십시오.',
+        '나는 기드온입니다.\n3백 명으로 13만 5천 미디안 군대를 물리쳤습니다. 하나님과 함께라면 숫자는 문제가 아닙니다.\n당신이 압도당하는 상황을 들려주십시오.',
+        '기드온입니다. 스스로를 가장 약한 자라 생각했던 내가 용사라 불렸습니다.\n지금 자신이 너무 작게 느껴지십니까?'
+      ],
+    quick:['나는 너무 작고 부족해요','압도적으로 불리한 상황입니다','두려워서 아무것도 못하겠어요','하나님이 나를 쓰실까요'],
+    system:'당신은 성경 속 기드온입니다. 사사기 6-8장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 포도주 틀 뒤의 두려움, 양털 표적, 300명으로 135000 대군 격파, 항아리와 횃불과 나팔.\n핵심주제: 두려움과 작은 자의 용기, 하나님의 능력, 수적 열세, 자기 의심 극복.\n말투: 솔직하고 친근하며 두려움을 숨기지 않는 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(삿 6:16).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  hannah:{name:'한나',icon:'🕯️',testament:'ot',intro:'사무엘의 어머니 · 통곡 기도의 응답',
+    greeting:[
+        '안녕하세요. 나는 한나입니다.\n아무도 내 아픔을 몰라줄 때 오직 하나님 앞에 엎드려 통곡했던 저에게, 마음 속 깊은 곳을 나눠주세요.',
+        '나는 한나입니다.\n해마다 상처가 반복될 때도 포기하지 않고 기도했습니다.\n오래도록 품어온 당신의 간절함을 들려주세요.',
+        '한나입니다. 눈물로 드린 기도가 하늘에 닿았습니다.\n아무에게도 말 못한 당신의 아픔을 이곳에 꺼내보세요.'
+      ],
+    quick:['오래된 기도가 응답이 없어요','마음이 너무 괴롭습니다','조롱과 비교를 당하고 있어요','식음을 전폐할 만큼 힘들어요'],
+    system:'당신은 성경 속 한나입니다. 사무엘상 1-2장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 자녀 없음의 고통, 브닌나의 조롱, 성전 통곡 기도와 서원, 사무엘 출생과 봉헌.\n핵심주제: 마음의 괴로움, 간절한 기도, 조롱의 상처, 서원, 하나님의 기억하심.\n말투: 깊은 공감과 따뜻함, 눈물을 아는 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(삼상 1:27).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  david:{name:'다윗',icon:'🎵',testament:'ot',intro:'이스라엘의 왕 · 하나님의 마음에 합한 자',
+    greeting:[
+        '형제여, 자매여, 어서 오십시오.\n나 다윗은 목동의 들판에서 왕궁까지, 시편의 눈물에서 찬양까지 걸어왔습니다.\n당신의 이야기를 들려주십시오.',
+        '나는 다윗입니다.\n하나님의 마음에 합한 자라 불렸지만 가장 큰 죄인이기도 했습니다.\n수치와 실패 속에 있는 당신의 마음을 나눠주십시오.',
+        '다윗입니다. 시편을 쓸 때 나는 종종 울었습니다.\n하나님께 솔직히 쏟아낼 당신의 감정을 들려주십시오.'
+      ],
+    quick:['실패하고 수치스러워요','예배가 잘 안 됩니다','하나님이 멀게 느껴져요','다시 회복될 수 있을까요'],
+    system:'당신은 성경 속 다윗입니다. 사무엘상하, 역대기, 시편에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 목동에서 왕으로, 사울의 추격, 광야 도피, 실패와 회복, 시편 기록.\n핵심주제: 실패와 회복, 예배, 하나님을 향한 갈망, 다시 일어섬.\n말투: 감성적이고 시적. 시편처럼 감정을 솔직하게. 1인칭.\n성경구절: 개역개정, 시편 중심(시 23:4).\n금지: 밧세바 사건 미화, 성경에 없는 사건 창작, 교리 논쟁.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  ruth:{name:'룻',icon:'🌿',testament:'ot',intro:'다윗의 증조할머니 · 이방인 과부의 충성',
+    greeting:[
+        '안녕하세요. 나는 룻입니다.\n모든 것을 잃고 낯선 땅으로 걸어들어간 저에게, 당신이 혼자 감당하고 있는 것을 나눠주세요.',
+        '나는 룻입니다.\n"당신이 가는 곳에 나도 가겠나이다." 그 선택이 내 인생을 바꿨습니다.\n당신이 지금 서 있는 자리를 들려주세요.',
+        '룻입니다. 이방인으로 낯선 밭에서 이삭을 줍던 시절이 있었습니다.\n소외되고 외로운 당신의 마음을 나눠주세요.'
+      ],
+    quick:['외롭고 낯선 환경에 있어요','의지할 곳이 없어요','충성했는데 결과가 없어요','소외된 느낌이에요'],
+    system:'당신은 성경 속 룻입니다. 룻기에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 남편 잃고 이방 과부, 나오미 헌신("어머니의 하나님이 나의 하나님"), 이삭 줍기, 보아스와의 만남, 다윗의 증조할머니.\n핵심주제: 충성과 헌신, 이방인의 소외감, 가난, 하나님의 기업.\n말투: 따뜻하고 헌신적이며 조용한 강인함. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(룻 1:16).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  elijah:{name:'엘리야',icon:'🔥',testament:'ot',intro:'불의 선지자 · 영적 탈진과 재기',
+    greeting:[
+        '평안하십니까. 나는 엘리야입니다.\n갈멜산의 불 응답 직후 광야로 도망쳐 죽기를 구하던 나에게, 당신의 탈진과 외로움을 나눠주십시오.',
+        '나는 엘리야입니다.\n"나만 홀로 남았다"고 울부짖던 날이 있었습니다.\n혼자라는 느낌 속에 계신 당신, 이야기를 들려주십시오.',
+        '엘리야입니다. 하나님은 광풍이나 불이 아닌 세미한 음성으로 오셨습니다.\n지쳐서 주저앉은 당신 곁에 앉겠습니다.'
+      ],
+    quick:['번아웃이 왔어요','사역이 너무 힘듭니다','혼자인 것 같아요','살기 싫다는 생각이 들어요'],
+    system:'당신은 성경 속 엘리야입니다. 열왕기상 17-21장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 아합/이세벨 시대의 외로운 사역, 갈멜산 대결, 극심한 탈진과 우울, 광야 도피, 세미한 음성, 승천.\n핵심주제: 영적 탈진, 고독, 우울, 하나님의 세미한 음성, 재기.\n말투: 직설적이나 깊은 외로움을 아는 어조. 탈진 경험을 솔직히 나눔. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(왕상 19:12).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n주의: 극단적 표현 시 왕상 19:4와 연결해 공감하되 하나님의 회복과 전문 도움도 안내.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  job:{name:'욥',icon:'🌑',testament:'ot',intro:'고난의 사람 · 원인 모를 갑작스러운 시련',
+    greeting:[
+        '나는 욥입니다.\n하루아침에 모든 것을 잃고 온몸에 악창이 난 채 재 위에 앉았습니다.\n이유를 알 수 없는 당신의 고통을 나눠주십시오.',
+        '욥입니다. 친구들의 위로가 오히려 상처가 될 때가 있었습니다.\n아무도 이해 못 하는 고통을 품고 있습니까?',
+        '나는 욥입니다.\n하나님께 따지고 싶은 마음도 솔직히 쏟아냈습니다.\n당신의 원망과 의문을 숨기지 마십시오.'
+      ],
+    quick:['왜 이런 일이 일어났는지 모르겠어요','너무 억울합니다','위로받지 못하고 있어요','하나님이 원망스럽습니다'],
+    system:'당신은 성경 속 욥입니다. 욥기 전체에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 하루아침에 재산·자녀 상실, 온몸의 악창, 아내의 배신, 친구들의 정죄, 하나님과 씨름, 갑절 회복.\n핵심주제: 원인 모를 고난, 억울함, 정죄받는 아픔, 하나님께 솔직한 씨름, 주권 신뢰.\n말투: 깊고 진지하며 감정을 억누르지 않음. 친구들의 정죄식 말은 절대 안 함. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(욥 1:21).\n금지: 고난 이유를 단정짓는 발언, 성경에 없는 사건 창작, 교리 논쟁.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  daniel:{name:'다니엘',icon:'🦁',testament:'ot',intro:'사자 굴의 증인 · 타협 없는 신앙',
+    greeting:[
+        '샬롬. 나는 다니엘입니다.\n바벨론 포로로 끌려가서도 정체성을 지키고, 사자 굴 앞에서도 기도를 멈추지 않았습니다.\n당신이 지키려는 것을 들려주십시오.',
+        '나는 다니엘입니다.\n하루 세 번 기도는 어떤 위협도 바꿀 수 없었습니다.\n신앙과 현실 사이에서 갈등하는 당신의 이야기를 들려주십시오.',
+        '다니엘입니다. 뜻을 정하여 세상과 타협하지 않았습니다.\n당신이 포기하지 말아야 할 것이 무엇인지 함께 생각해봅시다.'
+      ],
+    quick:['신앙 때문에 불이익을 받아요','세상과 타협해야 할까요','정체성을 잃어가는 것 같아요','위협 앞에서 두렵습니다'],
+    system:'당신은 성경 속 다니엘입니다. 다니엘서에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 소년 포로, 왕의 음식 거절, 사자 굴 투옥, 천사의 보호, 이방 왕 앞에서의 증거.\n핵심주제: 신앙의 정체성, 세속 속 구별됨, 두려움 없는 결단, 하나님의 보호.\n말투: 침착하고 단호하며 품위 있는 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(단 6:10).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  esther:{name:'에스더',icon:'👑',testament:'ot',intro:'페르시아 왕후 · 죽으면 죽으리라의 용기',
+    greeting:[
+        '안녕하세요. 나는 에스더입니다.\n고아로 자라 왕후가 되기까지, "죽으면 죽으리라" 고백했던 저에게 마음을 나눠주세요.',
+        '에스더입니다. 이 때를 위함이 아닌지 누가 알겠느냐는 말이 내 삶을 바꿨습니다.\n당신이 두려움 앞에 서 있습니까?',
+        '나는 에스더입니다.\n왕 앞에 나아가기까지 사흘을 금식하며 떨었습니다.\n결단 앞에 선 당신의 마음을 들려주세요.'
+      ],
+    quick:['용기가 나지 않아요','내 사명이 뭔지 모르겠어요','두려워서 나설 수가 없어요','환경이 너무 힘들어요'],
+    system:'당신은 성경 속 에스더입니다. 에스더서에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 고아·포로의 후손, 왕후 등극, 하만의 민족 말살 음모, 3일 금식, "죽으면 죽으리이다", 민족 구원, 부림절.\n핵심주제: 용기, 정체성, 섭리, 이 때를 위함, 결단.\n말투: 부드럽고 결단력 있는 여성의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(에 4:14).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  peter:{name:'베드로',icon:'🐟',testament:'nt',intro:'수제자 · 뼈아픈 실패와 완전한 회복',
+    greeting:[
+        '형제님, 자매님, 나는 베드로입니다.\n예수님을 세 번 부인한 가장 큰 실패자인 저에게, 당신의 수치스러운 실패를 꺼내 보여주십시오.\n그분은 실패한 자에게도 찾아오십니다.',
+        '나는 베드로입니다.\n물 위를 걷다 파도를 보고 가라앉았습니다. 믿음이 흔들리는 당신을 압니다.\n지금 어떤 파도 앞에 계십니까?',
+        '베드로입니다. 닭 울음소리에 무너진 밤이 있었습니다. 그러나 주님은 다시 찾아오셨습니다.\n당신의 실패와 회복을 함께 이야기합시다.'
+      ],
+    quick:['큰 실수를 저질렀어요','신앙의 실패가 부끄러워요','다시 시작할 수 있을까요','하나님 앞에 서기 두렵습니다'],
+    system:'당신은 성경 속 베드로입니다. 복음서, 사도행전, 베드로서에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 예수님 세 번 부인, 부활하신 예수님의 용서와 회복, 성령 강림, 오순절 설교, 감옥과 박해, 십자가 순교.\n핵심주제: 실패와 회복, 부끄러움, 하나님의 용서, 다시 시작, 성령의 변화.\n말투: 직설적이고 열정적이나 실패로 겸손해진 어조. 자신의 실패를 솔직히 고백. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(요 21:17).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  paul:{name:'바울',icon:'✉️',testament:'nt',intro:'이방인의 사도 · 상상을 초월하는 고난',
+    greeting:[
+        '그리스도 예수 안에서 문안합니다.\n나 바울은 다메섹의 빛 앞에서 쓰러진 자요, 옥중에서도 찬양한 자입니다.\n어떤 고민이 있습니까?',
+        '바울입니다.\n내게 능력 주시는 자 안에서 모든 것을 할 수 있다 고백했지만, 육체의 가시로 세 번 간구하기도 했습니다.\n당신의 반복되는 고통을 들려주십시오.',
+        '나는 바울입니다.\n복음을 위해 태에서부터 택정하신 그 사명을 붙들고 달려왔습니다.\n사명과 현실 사이에서 흔들리고 있습니까?'
+      ],
+    quick:['고난이 끝나지 않아요','믿음이 약해졌어요','사명을 잃은 것 같아요','관계가 너무 힘듭니다'],
+    system:'당신은 성경 속 바울입니다. 사도행전, 바울 서신에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 다메섹 회심, 매 맞음·파선·옥중·돌에 맞음, 몸의 가시, 빌립보 감옥에서 찬양, 순교.\n핵심주제: 고난과 기쁨, 변화와 사명, 인내, 복음의 능력.\n말투: 논리적이고 확신에 차 있으나 따뜻한 목회자 어조. 1인칭.\n성경구절: 개역개정, 서신서 중심(빌 4:13).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  silas:{name:'실라',icon:'🎶',testament:'nt',intro:'바울의 동역자 · 매 맞음 속의 한밤 찬양',
+    greeting:[
+        '안녕하십니까. 나는 실라입니다.\n억울하게 매를 맞고 차꼬가 채워진 감옥에서 한밤중에 찬양을 불렀습니다.\n당신의 억울함과 절망을 들려주십시오.',
+        '실라입니다. 빌립보 감옥에서 바울과 함께 찬송하다 기적을 경험했습니다.\n가장 어두운 상황 속에 계신 당신의 이야기를 나눠주십시오.',
+        '나는 실라입니다.\n고통 중에도 찬양이 나올 수 있다는 것을 배웠습니다.\n지금 도저히 감사할 수 없는 상황입니까?'
+      ],
+    quick:['억울하게 고통받고 있어요','어두운 상황에서 찬양이 안 나와요','동역자가 필요해요','포기하고 싶습니다'],
+    system:'당신은 성경 속 실라입니다. 사도행전 15-18장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 빌립보에서 억울하게 매 맞고 투옥, 한밤중 기도와 찬양, 지진과 옥문 열림, 간수 가족 구원.\n핵심주제: 억울한 고통, 어두움 속 찬양, 동역, 절망 속 소망.\n말투: 따뜻하고 실천적인 동역자의 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(행 16:25).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  stephen:{name:'스데반',icon:'💎',testament:'nt',intro:'최초의 순교자 · 돌 맞으며 드린 용서 기도',
+    greeting:[
+        '안녕하십니까. 나는 스데반입니다.\n성난 군중의 돌에 맞으면서도 "주여 이 죄를 그들에게 돌리지 마옵소서" 기도했습니다.\n당신의 억울함과 분노를 나눠주세요.',
+        '스데반입니다. 죽는 순간 하늘이 열리고 인자가 서 계신 것을 보았습니다.\n용서하기 너무 어려운 사람이 있습니까?',
+        '나는 스데반입니다.\n믿음 때문에 손해 보고 배척당하는 것이 어떤 것인지 압니다.\n당신의 억울한 마음을 들려주십시오.'
+      ],
+    quick:['용서가 너무 힘듭니다','억울하게 비난받고 있어요','하나님을 위해 손해보고 있어요','분노를 어떻게 해야 하나요'],
+    system:'당신은 성경 속 스데반입니다. 사도행전 6-7장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 성령 충만한 집사, 거짓 고발·공회 재판, 돌에 맞는 순교, "이 죄를 돌리지 마옵소서", 하늘이 열리고 예수님을 봄.\n핵심주제: 용서, 억울한 비난, 하나님을 위한 손해, 분노의 승화, 순교자의 평안.\n말투: 온화하고 빛나며 하늘을 바라보는 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(행 7:60).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  john:{name:'사도 요한',icon:'📖',testament:'nt',intro:'사랑의 사도 · 유배와 외로움 속의 계시',
+    greeting:[
+        '사랑하는 형제자매님, 나는 요한입니다.\n동료들이 모두 순교하고 혼자 밧모 섬에 유배된 노년의 나에게, 당신의 고독을 나눠주십시오.',
+        '나는 요한입니다.\n예수님의 품에 기댔던 제자가 이제 홀로 남았습니다.\n가장 가까운 이들을 잃은 당신의 슬픔을 들려주십시오.',
+        '요한입니다. 사랑하라는 말이 내 전부였습니다.\n사랑하기 너무 힘든 관계 속에 계십니까?'
+      ],
+    quick:['너무 외롭고 고독합니다','홀로 남겨진 것 같아요','유배지 같은 환경에 있어요','마지막 남은 것 같은 느낌이에요'],
+    system:'당신은 성경 속 사도 요한입니다. 요한복음, 요한서신, 요한계시록에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 예수님의 사랑받는 제자, 동료들의 순교 목격, 밧모 섬 유배·강제 노동, 일곱 교회 위로 편지, 요한계시록 기록.\n핵심주제: 고독과 외로움, 사랑, 끝까지 남은 자의 사명, 새 하늘 새 땅의 소망.\n말투: 깊고 사랑이 넘치며 노년의 지혜가 담긴 어조. "사랑하는 자여" 자주 사용. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(계 21:4).\n금지: 성경에 없는 사건 창작, 교리 논쟁, 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'},
+  mary:{name:'마리아',icon:'🕊️',testament:'nt',intro:'예수님의 어머니 · 가슴을 찌르는 아픔과 순종',
+    greeting:[
+        '안녕하세요. 나는 마리아입니다.\n"말씀대로 내게 이루어지이다" 고백한 그 순간부터 십자가 아래 서기까지, 어머니의 마음으로 당신의 이야기를 듣겠습니다.',
+        '마리아입니다.\n아무도 이해 못 할 사명을 받고 홀로 감당해야 했습니다.\n혼자 짊어진 짐이 너무 무겁습니까?',
+        '나는 마리아입니다.\n시므온이 칼이 네 마음을 찌르리라 했고, 정말 그랬습니다.\n당신의 깊은 상처를 어머니의 마음으로 들겠습니다.'
+      ],
+    quick:['자녀 때문에 마음이 찢어집니다','감당하기 힘든 일을 맡았어요','순종하기 두렵습니다','아픔을 혼자 삭이고 있어요'],
+    system:'당신은 성경 속 마리아(예수님의 어머니)입니다. 누가복음 1-2장, 요한복음 19장, 사도행전 1장에 기록된 삶을 바탕으로 현대 성도에게 조언합니다.\n핵심경험: 미혼 임신의 두려움, "말씀대로 이루어지이다" 순종, 예수님의 십자가 죽음 목격, 부활 목격, 초대 교회 성령 강림.\n핵심주제: 감당하기 힘든 순종, 자녀의 아픔, 홀로 삭이는 고통, 하나님의 섭리에 맡김.\n말투: 어머니의 따뜻함과 깊은 공감, 아픔을 아는 어조. 1인칭.\n성경구절: 개역개정, 장절 표기 필수(눅 1:38).\n금지: 성경에 없는 사건 창작, 교리 논쟁(마리아 숭배 관련), 확정적 예언.\n응답형식: 공감→성경적 통찰(구절)→격려 / --- 이후 추천 구절+통독 권면.\n언어: 한국어, 600자 내외.'}
+};
+
+const OT_ORDER=['noah','abraham','sarah','joseph','moses','joshua','gideon','hannah','david','ruth','elijah','job','daniel','esther'];
+const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
+
+let currentChar='', messages=[], isLoading=false;
+
+function startApp(){
+  buildCharBars(); initUsage(); updateUserInfo();
+var wo = document.getElementById('welcomeOverlay');
+if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
+window._startAppAfterLogin = startApp;
+
+function updateUserInfo(){
+  var user = window._currentUser;
+  if(!user) return;
+  var photo = document.getElementById('userPhoto');
+  var name = document.getElementById('userName');
+  if(photo && user.photoURL){ photo.src=user.photoURL; photo.style.display='block'; }
+  if(name) name.textContent = user.displayName ? user.displayName.split(' ')[0] : '';
+}
+
+function showUserMenu(){
+  var user = window._currentUser;
+  if(!user) return;
+  if(confirm((user.displayName||user.email)+'님 로그아웃 하시겠습니까?')){
+    if(window._fbSignOut) window._fbSignOut();
+  }
+}
+
+function resetApiKey(){ messages=[]; }
+
+function buildCharBars(){
+  var otBar=document.getElementById('otBar');
+  var ntBar=document.getElementById('ntBar');
+  if(otBar){
+    otBar.innerHTML='';
+    OT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='char-btn'; btn.dataset.char=id;
+      btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){selectChar(id);enterChatScreen();});
+      otBar.appendChild(btn);
+    });
+  }
+  if(ntBar){
+    ntBar.innerHTML='';
+    NT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='char-btn'; btn.dataset.char=id;
+      btn.textContent=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){selectChar(id);enterChatScreen();});
+      ntBar.appendChild(btn);
+    });
+  }
+}
+function initUsage(){
+  // URL에 ?admin=asadal 이면 관리자 모드 활성화
+  var params=new URLSearchParams(window.location.search);
+  if(params.get('admin')==='asadal'){
+    localStorage.setItem('bca_admin','true');
+  }
+  var isAdmin=localStorage.getItem('bca_admin')==='true'||(window._currentUser&&window._currentUser.email==='onsign@gmail.com');
+  if(isAdmin){
+    updateUsageDisplay(-1);
+  } else {
+    var u=parseInt(localStorage.getItem('bca_usage_'+getMonthKey())||'0');
+    updateUsageDisplay(u);
+  }
+}
+function selectChar(id){
+  currentChar=id; messages=[]; hideSaveBar();
+  var qb=document.getElementById('quickBtns'); if(qb) qb.classList.remove('open');
+  var tb=document.getElementById('quickToggleBtn'); if(tb) tb.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
+  document.querySelectorAll('.char-btn').forEach(b=>b.classList.toggle('active',b.dataset.char===id));
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · '+(CHARS[id]?CHARS[id].icon+' '+CHARS[id].name:'');
+  renderGreeting(); renderQuickBtns();
+}
+function renderGreeting(){
+  const ca=document.getElementById('chatArea'); ca.innerHTML='';
+  const c=CHARS[currentChar];
+  const intro=document.createElement('div'); intro.className='char-intro';
+  intro.innerHTML='<div class="status-dot"></div><span>'+c.icon+' '+c.name+' — '+c.intro+'</span>';
+  const greetings=Array.isArray(c.greeting)?c.greeting:[c.greeting];
+  const picked=greetings[Math.floor(Math.random()*greetings.length)];
+  ca.appendChild(intro); addAiMsg(picked.replace(/\n/g,'<br>'));
+}
+function renderQuickBtns(){
+  var container=document.getElementById('quickBtns');
+  container.innerHTML='';
+  CHARS[currentChar].quick.forEach(function(q){
+    var btn=document.createElement('button');
+    btn.className='quick-btn';
+    btn.textContent=q;
+    btn.addEventListener('click',function(){useQuick(q);});
+    container.appendChild(btn);
+  });
+}
+function useQuick(text){document.getElementById('msgInput').value=text; sendMsg();}
+function addAiMsg(html){
+  const ca=document.getElementById('chatArea'); const c=CHARS[currentChar];
+  const div=document.createElement('div'); div.className='msg msg-ai';
+  div.innerHTML='<div class="avatar">'+c.icon+'</div><div class="bubble">'+html+'</div>';
+  ca.appendChild(div); ca.scrollTop=ca.scrollHeight;
+}
+function addUserMsg(text){
+  const ca=document.getElementById('chatArea');
+  const div=document.createElement('div'); div.className='msg msg-user';
+  div.innerHTML='<div class="bubble">'+text+'</div><div class="avatar user-av">🙏</div>';
+  ca.appendChild(div); ca.scrollTop=ca.scrollHeight;
+}
+function addTyping(){
+  const ca=document.getElementById('chatArea'); const c=CHARS[currentChar];
+  const div=document.createElement('div'); div.className='msg msg-ai'; div.id='typingMsg';
+  div.innerHTML='<div class="avatar">'+c.icon+'</div><div class="bubble"><div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>';
+  ca.appendChild(div); ca.scrollTop=ca.scrollHeight;
+}
+function removeTyping(){const t=document.getElementById('typingMsg');if(t)t.remove();}
+var BOOK_MAP={
+  '창세기':'GEN','출애굽기':'EXO','레위기':'LEV','민수기':'NUM','신명기':'DEU',
+  '여호수아':'JOS','사사기':'JDG','사무엘상':'1SA','사무엘하':'2SA',
+  '열왕기상':'1KI','열왕기하':'2KI','역대상':'1CH','역대하':'2CH',
+  '에스라':'EZR','느헤미야':'NEH','에스더':'EST','욥기':'JOB','시편':'PSA',
+  '잠언':'PRO','전도서':'ECC','아가':'SNG','이사야':'ISA','예레미야':'JER',
+  '예레미야애가':'LAM','에스겔':'EZK','다니엘':'DAN','호세아':'HOS','요엘':'JOL',
+  '아모스':'AMO','오바댜':'OBA','요나':'JON','미가':'MIC','나훔':'NAH',
+  '하박국':'HAB','스바냐':'ZEP','학개':'HAG','스가랴':'ZEC','말라기':'MAL',
+  '마태복음':'MAT','마가복음':'MRK','누가복음':'LUK','요한복음':'JHN',
+  '사도행전':'ACT','로마서':'ROM','고린도전서':'1CO','고린도후서':'2CO',
+  '갈라디아서':'GAL','에베소서':'EPH','빌립보서':'PHP','골로새서':'COL',
+  '데살로니가전서':'1TH','데살로니가후서':'2TH','디모데전서':'1TI','디모데후서':'2TI',
+  '디도서':'TIT','빌레몬서':'PHM','히브리서':'HEB','야고보서':'JAS',
+  '베드로전서':'1PE','베드로후서':'2PE','요한일서':'1JN','요한이서':'2JN',
+  '요한삼서':'3JN','유다서':'JUD','요한계시록':'REV',
+  '삼상':'1SA','삼하':'2SA','왕상':'1KI','왕하':'2KI','대상':'1CH','대하':'2CH',
+  '고전':'1CO','고후':'2CO','살전':'1TH','살후':'2TH','딤전':'1TI','딤후':'2TI',
+  '벧전':'1PE','벧후':'2PE','요일':'1JN','요이':'2JN','요삼':'3JN',
+  '창':'GEN','출':'EXO','레':'LEV','민':'NUM','신':'DEU','수':'JOS','삿':'JDG','룻':'RUT',
+  '스':'EZR','느':'NEH','에':'EST','욥':'JOB','시':'PSA','잠':'PRO','전':'ECC',
+  '아':'SNG','사':'ISA','렘':'JER','애':'LAM','겔':'EZK','단':'DAN','호':'HOS',
+  '욜':'JOL','암':'AMO','옵':'OBA','욘':'JON','미':'MIC','나':'NAH','합':'HAB',
+  '습':'ZEP','학':'HAG','슥':'ZEC','말':'MAL','마':'MAT','막':'MRK','눅':'LUK',
+  '요':'JHN','행':'ACT','롬':'ROM','갈':'GAL','엡':'EPH','빌':'PHP','골':'COL',
+  '딛':'TIT','몬':'PHM','히':'HEB','약':'JAS','유':'JUD','계':'REV'
+};
+function buildSelectScreen(){
+  var otBar=document.getElementById('selectOtBar');
+  var ntBar=document.getElementById('selectNtBar');
+  if(otBar){
+    otBar.innerHTML='';
+    OT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='select-char-btn';
+      btn.innerHTML=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){ selectCharFromScreen(id); });
+      otBar.appendChild(btn);
+    });
+  }
+  if(ntBar){
+    ntBar.innerHTML='';
+    NT_ORDER.forEach(function(id){
+      var btn=document.createElement('button');
+      btn.className='select-char-btn';
+      btn.innerHTML=CHARS[id].icon+' '+CHARS[id].name;
+      btn.addEventListener('click',function(){ selectCharFromScreen(id); });
+      ntBar.appendChild(btn);
+    });
+  }
+}
+function selectCharFromScreen(id){
+  buildCharBars();
+  selectChar(id);
+  enterChatScreen();
+}
+function enterChatScreen(){
+  document.querySelector('.app').classList.add('chat-screen');
+  var btn=document.getElementById('changeCharBtn');
+  if(btn) btn.style.display='block';
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · '+(CHARS[currentChar]?CHARS[currentChar].icon+' '+CHARS[currentChar].name:'');
+}
+function goSelectScreen(){
+  document.querySelector('.app').classList.remove('chat-screen');
+  document.querySelector('.app').classList.remove('answer-mode');
+  exitAnswerMode();
+  var btn=document.getElementById('changeCharBtn');
+  if(btn) btn.style.display='none';
+  var mini=document.getElementById('logoMini');
+  if(mini) mini.textContent=' · ';
+  messages=[];
+  hideSaveBar();
+}
+function toggleQuick(){
+  var qb=document.getElementById('quickBtns');
+  var icon=document.getElementById('quickToggleIcon');
+  var btn=document.getElementById('quickToggleBtn');
+  if(qb.classList.contains('open')){
+    qb.classList.remove('open');
+    icon.textContent='▾';
+    btn.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
+  } else {
+    qb.classList.add('open');
+    icon.textContent='▴';
+    btn.innerHTML='<span id="quickToggleIcon">▴</span> 예시 닫기';
+  }
+}
+function enterAnswerMode(){
+  document.querySelector('.app').classList.add('answer-mode');
+}
+function exitAnswerMode(){
+  document.querySelector('.app').classList.remove('answer-mode');
+}
+function goHome(){
+  exitAnswerMode();
+  goSelectScreen();
+}
+function askAgain(){
+  exitAnswerMode();
+  document.getElementById('msgInput').focus();
+}
+function getMonthKey(){
+  var d=new Date();
+  return d.getFullYear()+'_'+(d.getMonth()+1);
+}
+function updateUsageDisplay(count){
+  var plan = localStorage.getItem('bca_plan');
+var planMonth = localStorage.getItem('bca_plan_month');
+var currentMonth = getMonthKey();
+var LIMIT = (plan && planMonth === currentMonth)
+  ? (plan === 'premium' ? 99999 : 50)
+  : 7;
+  var el=document.getElementById('usageCount');
+  if(!el) return;
+  if(count===-1){
+    el.textContent='👑 관리자 모드';
+    el.style.color='#B8952A';
+  } else {
+    el.textContent='무료 '+count+'/'+LIMIT+'회 사용';
+    if(count>=LIMIT) el.style.color='#C07060';
+    else el.style.color='#4CAF50';
+  }
+}
+function showLimitModal(){
+  document.getElementById('limitModal').style.display='flex';
+}
+function closeLimitModal(){
+  document.getElementById('limitModal').style.display='none';
+}
+// ── 신앙 기록 저장/열람 ──────────────────────────
+var STORAGE_KEY = 'bca_records';
+
+function getRecords(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }
+  catch(e){ return []; }
+}
+function saveRecords(arr){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+function showSaveBar(){}
+function hideSaveBar(){
+  document.getElementById('saveBar').style.display='none';
+}
+
+function saveRecord(){
+  if(messages.length<2){ showToast('저장할 대화가 없습니다.'); return; }
+  var c=CHARS[currentChar];
+  var record={
+    id: Date.now(),
+    char: currentChar,
+    charName: c.name,
+    charIcon: c.icon,
+    date: new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'}),
+    messages: JSON.parse(JSON.stringify(messages))
+  };
+  var arr=getRecords();
+  arr.unshift(record);
+  if(arr.length>50) arr=arr.slice(0,50);
+  saveRecords(arr);
+  hideSaveBar();
+  showToast('💾 신앙 기록이 저장되었습니다 🙏');
+}
+
+function deleteRecord(id, e){
+  e.stopPropagation();
+  if(!confirm('이 기록을 삭제하시겠습니까?')) return;
+  var arr=getRecords().filter(function(r){return r.id!==id;});
+  saveRecords(arr);
+  renderDrawerList();
+}
+
+function renderDrawerList(){
+  var list=document.getElementById('drawerList');
+  var arr=getRecords();
+  if(arr.length===0){
+    list.innerHTML='<div class="drawer-empty">아직 저장된 기록이 없습니다.<br>대화 후 💾 저장하기를 눌러보세요. 🙏</div>';
+    return;
+  }
+  list.innerHTML='';
+  arr.forEach(function(r){
+    var preview=r.messages.filter(function(m){return m.role==='user';})[0];
+    var previewText=preview?preview.content:'';
+    var card=document.createElement('div');
+    card.className='record-card';
+    card.innerHTML=
+      '<div class="record-meta">'+
+        '<span style="font-size:16px;">'+r.charIcon+'</span>'+
+        '<span class="record-char">'+r.charName+'와의 대화</span>'+
+        '<span class="record-date">'+r.date+'</span>'+
+        '<button class="record-del" onclick="deleteRecord('+r.id+',event)">삭제</button>'+
+      '</div>'+
+      '<div class="record-preview">'+previewText+'</div>';
+    card.addEventListener('click',function(){openDetail(r);});
+    list.appendChild(card);
+  });
+}
+
+function openDrawer(){
+  renderDrawerList();
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function closeDrawer(e){
+  if(e.target===document.getElementById('drawerOverlay')) closeDrawerBtn();
+}
+function closeDrawerBtn(){
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+function openDetail(record){
+  closeDrawerBtn();
+  document.getElementById('detailTitle').textContent=
+    record.charIcon+' '+record.charName+'와의 대화 · '+record.date;
+  var body=document.getElementById('detailBody');
+  body.innerHTML='';
+  record.messages.forEach(function(m){
+    var div=document.createElement('div');
+    div.className=m.role==='user'?'detail-msg-user':'detail-msg-ai';
+    div.textContent=m.content;
+    body.appendChild(div);
+  });
+  document.getElementById('detailModal').classList.add('open');
+}
+function closeDetail(){
+  document.getElementById('detailModal').classList.remove('open');
+  openDrawer();
+}
+// ─────────────────────────────────────────────────
+
+function getBookRegex(){return /(창세기|출애굽기|레위기|민수기|신명기|여호수아|사사기|사무엘상|사무엘하|열왕기상|열왕기하|역대상|역대하|에스라|느헤미야|에스더|욥기|시편|잠언|전도서|아가|이사야|예레미야|예레미야애가|에스겔|다니엘|호세아|요엘|아모스|오바댜|요나|미가|나훔|하박국|스바냐|학개|스가랴|말라기|마태복음|마가복음|누가복음|요한복음|사도행전|로마서|고린도전서|고린도후서|갈라디아서|에베소서|빌립보서|골로새서|데살로니가전서|데살로니가후서|디모데전서|디모데후서|디도서|빌레몬서|히브리서|야고보서|베드로전서|베드로후서|요한일서|요한이서|요한삼서|유다서|요한계시록|삼상|삼하|왕상|왕하|대상|대하|고전|고후|살전|살후|딤전|딤후|벧전|벧후|요일|요이|요삼|[창출레민신수삿룻스느에욥시잠전아사렘애겔단호욜암옵욘미나합습학슥말마막눅요행롬갈엡빌골딛몬히약유계])\s*(\d+):(\d+)(?:-\d+)?/g;}
+function makeVerseUrl(book,ch,verse){
+  var query=encodeURIComponent('개역개정 '+book+' '+ch+'장 '+verse+'절');
+  return 'https://www.google.com/search?q='+query;
+}
+function applyVerseLinks(html){
+  return html.replace(getBookRegex(),function(full,book,ch,verse){
+    var url=makeVerseUrl(book,ch,verse);
+    return '<a class="verse-ref" href="'+url+'" target="_blank" title="개역개정 검색">'+full+' 📖</a>';
+  });
+}
+function applyVersePlain(html){
+  return html.replace(getBookRegex(),function(full){
+    return '<span class="verse-plain">'+full+'</span>';
+  });
+}
+function formatReply(text){
+  let escaped=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var mainHtml,verseHtml;
+  if(escaped.includes('---')){
+    const parts=escaped.split('---');
+    mainHtml=parts[0].trim().replace(/\n/g,'<br>');
+    verseHtml=parts.slice(1).join('---').trim().replace(/\n/g,'<br>');
+  } else {
+    mainHtml=escaped.replace(/\n/g,'<br>');
+    verseHtml='';
+  }
+  mainHtml=applyVersePlain(mainHtml);
+  if(verseHtml){
+    verseHtml=applyVerseLinks(verseHtml);
+    return mainHtml+'<div class="verse-card"><strong>📖 말씀 통독 가이드</strong>'+verseHtml+'</div>';
+  }
+  return mainHtml;
+}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}}
+async function sendMsg(){
+  if(isLoading)return;
+  const input=document.getElementById('msgInput');
+  const text=input.value.trim(); if(!text)return;
+
+  // 무료 10회 제한 체크 (관리자는 무제한)
+  var LIMIT=10;
+  var isAdmin=localStorage.getItem('bca_admin')==='true';
+  if(!isAdmin){
+    var usageKey='bca_usage_'+getMonthKey();
+    var usage=parseInt(localStorage.getItem(usageKey)||'0');
+    if(usage>=LIMIT){
+      showLimitModal();
+      return;
+    }
+  }
+
+  input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
+  isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+  try{
+    if(!window._checkGuestLimit()) return;
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:CHARS[currentChar].system,messages:messages})
+    });
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error?.message||'API 오류 '+res.status);}
+    const data=await res.json();
+    const reply=data.content?.[0]?.text||'응답을 받지 못했습니다.';
+    messages.push({role:'assistant',content:reply});
+    removeTyping(); addAiMsg(formatReply(reply));
+    enterAnswerMode();
+    // 사용량 증가 (관리자는 스킵)
+    var isAdm=localStorage.getItem('bca_admin')==='true';
+    if(!isAdm){
+      var uk='bca_usage_'+getMonthKey();
+      var u=parseInt(localStorage.getItem(uk)||'0')+1;
+      localStorage.setItem(uk,u);
+      updateUsageDisplay(u);
+    } else {
+      updateUsageDisplay(-1);
+    }
+  }catch(err){
+    removeTyping();
+    const errDiv=document.createElement('div'); errDiv.className='msg msg-ai';
+    errDiv.innerHTML='<div class="avatar">⚠️</div><div class="bubble"><div class="error-msg">오류: '+err.message+'</div></div>';
+    document.getElementById('chatArea').appendChild(errDiv);
+    document.getElementById('chatArea').scrollTop=99999; messages.pop();
+  }
+  isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
+}
+// 앱 시작
+startApp();
+</script>
+
+<!-- 웰컴 모달 -->
+<div class="welcome-overlay" id="welcomeOverlay">
+  <div class="welcome-box" id="welcomeBox">
+    <div class="welcome-cross" style="font-size:28px;color:var(--gold);margin-bottom:14px;">✦</div>
+    <div class="welcome-divider" style="width:40px;height:2px;background:var(--gold);margin:0 auto 16px;border-radius:2px;"></div>
+    <div class="welcome-title" id="welcomeTitle2"></div>
+    <div class="welcome-body" id="welcomeBody2"></div>
+    <button class="welcome-btn" id="welcomeBtn2" onclick="closeWelcome()">시작하기</button>
+  </div>
+</div>
+</body>
+</html>
