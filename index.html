@@ -232,9 +232,10 @@ textarea:focus { border-color:var(--gold); }
 .error-msg { font-size:12px; color:#C07060; padding:7px 12px; background:rgba(180,60,40,.08); border-radius:8px; border:.5px solid rgba(180,60,40,.2); }
 
 .welcome-overlay {
-  position:fixed; inset:0; background:rgba(26,22,16,0.82);
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background:rgba(26,22,16,0.92);
   display:none; align-items:center; justify-content:center;
-  z-index:999; padding:20px;
+  z-index:99999; padding:20px; box-sizing:border-box;
 }
 .welcome-box {
   background:var(--parchment);
@@ -1476,7 +1477,7 @@ startApp();
   </div>
   <div style="margin-top:6px;color:#6a5a40;">© 2026 BibleCharacter.AI. All rights reserved.</div>
 </div>
-  <div class="welcome-overlay" id="welcomeOverlay" style="position:fixed;inset:0;background:rgba(26,22,16,0.82);display:none;align-items:center;justify-content:center;z-index:99999;padding:20px;">
+  <div class="welcome-overlay" id="welcomeOverlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(26,22,16,0.92);display:none;align-items:center;justify-content:center;z-index:99999;padding:20px;box-sizing:border-box;">
   <div class="welcome-box" id="welcomeBox" style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:36px 32px 28px;max-width:420px;width:100%;text-align:center;">
     <div class="welcome-cross" style="font-size:28px;color:var(--gold);margin-bottom:14px;">✦</div>
     <div class="welcome-divider" style="width:40px;height:2px;background:var(--gold);margin:0 auto 16px;border-radius:2px;"></div>
@@ -1487,18 +1488,3 @@ startApp();
 </div>
 </body>
 </html>
-
-
-
-
-
-📥
-
-N
-
-T
-
-B
-
-ALL
-설명
