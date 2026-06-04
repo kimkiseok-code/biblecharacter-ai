@@ -111,23 +111,35 @@ window.startPayment = function(plan) {
   const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직' : 'BibleCharacter.AI 프리미엄';
   const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
 
-  const clientKey = 'test_ck_LlDJaYngro2lnQOYgmynVezGdRpX';
+  function loadIamport(callback) {
+    if(window.IMP) { callback(); return; }
+    var script = document.createElement('script');
+    script.src = 'https://cdn.iamport.kr/js/iamport.payment-1.2.0.js';
+    script.onload = callback;
+    document.head.appendChild(script);
+  }
 
-  const script = document.createElement('script');
-  script.src = 'https://js.tosspayments.com/v1/payment';
-  script.onload = function() {
-    const tossPayments = TossPayments(clientKey);
-    tossPayments.requestPayment('카드', {
-      amount,
-      orderId,
-      orderName,
-      customerName: window._currentUser.name || window._currentUser.email,
-      customerEmail: window._currentUser.email,
-      successUrl: window.location.origin + '/payment-success.html',
-      failUrl: window.location.origin + '/payment-fail.html',
+  loadIamport(function() {
+    IMP.init('imp42483665');
+    IMP.request_pay({
+      pg: 'kpn',
+      pay_method: 'card',
+      merchant_uid: orderId,
+      name: orderName,
+      amount: amount,
+      buyer_name: window._currentUser.name || window._currentUser.email,
+      buyer_email: window._currentUser.email,
+    }, function(rsp) {
+      if(rsp.success) {
+        localStorage.setItem('bca_plan', plan);
+        localStorage.setItem('bca_plan_exp', Date.now() + 30*24*60*60*1000);
+        alert('결제가 완료되었습니다! ' + orderName + ' 플랜이 활성화되었습니다.');
+        window.location.reload();
+      } else {
+        alert('결제 실패: ' + rsp.error_msg);
+      }
     });
-  };
-  document.head.appendChild(script);
+  });
 };
   window.doLogout = function() {
   localStorage.removeItem('bca_user');
