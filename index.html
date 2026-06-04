@@ -122,7 +122,7 @@ window.startPayment = function(plan) {
   loadIamport(function() {
     IMP.init('imp42483665');
     IMP.request_pay({
-      pg: 'kpn',
+      pg: 'kakaopay.TC0ONETIME',
       pay_method: 'card',
       merchant_uid: orderId,
       name: orderName,
