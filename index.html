@@ -110,33 +110,28 @@ window.startPayment = function(plan) {
   const amount = plan === 'basic' ? 2900 : 4900;
   const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직' : 'BibleCharacter.AI 프리미엄';
   const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+  const clientKey = 'S2_65ce1606daaa4b07bd4a35d9cd2bee31';
 
-  function loadIamport(callback) {
-    if(window.IMP) { callback(); return; }
+  function loadNicepay(callback) {
+    if(window.AUTHNICE) { callback(); return; }
     var script = document.createElement('script');
-    script.src = 'https://cdn.iamport.kr/js/iamport.payment-1.2.0.js';
+    script.src = 'https://pay.nicepay.co.kr/v1/js/';
     script.onload = callback;
     document.head.appendChild(script);
   }
 
-  loadIamport(function() {
-    IMP.init('imp42483665');
-    IMP.request_pay({
-      pg: 'kakaopay.TC0ONETIME',
-      pay_method: 'card',
-      merchant_uid: orderId,
-      name: orderName,
+  loadNicepay(function() {
+    AUTHNICE.requestPay({
+      clientId: clientKey,
+      method: 'card',
+      orderId: orderId,
       amount: amount,
-      buyer_name: window._currentUser.name || window._currentUser.email,
-      buyer_email: window._currentUser.email,
-    }, function(rsp) {
-      if(rsp.success) {
-        localStorage.setItem('bca_plan', plan);
-        localStorage.setItem('bca_plan_exp', Date.now() + 30*24*60*60*1000);
-        alert('결제가 완료되었습니다! ' + orderName + ' 플랜이 활성화되었습니다.');
-        window.location.reload();
-      } else {
-        alert('결제 실패: ' + rsp.error_msg);
+      goodsName: orderName,
+      buyerName: window._currentUser.name || window._currentUser.email,
+      buyerEmail: window._currentUser.email,
+      returnUrl: window.location.origin + '/api/nicepay-confirm',
+      fnError: function(result) {
+        alert('결제 오류: ' + result.msg);
       }
     });
   });
