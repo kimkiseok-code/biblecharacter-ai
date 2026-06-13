@@ -110,7 +110,7 @@ window.startPayment = function(plan) {
   const amount = plan === 'basic' ? 2900 : 4900;
   const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직' : 'BibleCharacter.AI 프리미엄';
   const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
-  const clientKey = 'S2_65ce1606daaa4b07bd4a35d9cd2bee31';
+  const clientKey = 'R2_6d7910cf70de46eba6ff4fbef76ebf5f';
 
   function loadNicepay(callback) {
     if(window.AUTHNICE) { callback(); return; }
