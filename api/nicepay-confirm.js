@@ -6,12 +6,13 @@ export default async function handler(req, res) {
     return res.redirect(`/payment-fail.html?msg=${encodeURIComponent(authResultMsg)}`);
   }
 
-  // 나이스페이 최종 승인 요청
+  // 나이스페이 최종 승인 요청 (실결제)
+  const clientKey = process.env.NICEPAY_CLIENT_KEY;
   const secretKey = process.env.NICEPAY_SECRET_KEY;
-  const basicToken = Buffer.from(`${process.env.NICEPAY_CLIENT_KEY}:${secretKey}`).toString('base64');
+  const basicToken = Buffer.from(`${clientKey}:${secretKey}`).toString('base64');
 
   try {
-    const confirmRes = await fetch(`https://sandbox-api.nicepay.co.kr/v1/payments/${tid}`, {
+    const confirmRes = await fetch(`https://api.nicepay.co.kr/v1/payments/${tid}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -23,7 +24,6 @@ export default async function handler(req, res) {
     const data = await confirmRes.json();
 
     if(data.resultCode === '0000') {
-      // 결제 성공
       return res.redirect('/payment-success.html');
     } else {
       return res.redirect(`/payment-fail.html?msg=${encodeURIComponent(data.resultMsg)}`);
