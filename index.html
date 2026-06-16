@@ -1402,6 +1402,8 @@ function applyVersePlain(html){
 }
 function formatReply(text){
   let escaped=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // 마크다운 볼드 변환 (**텍스트** → <strong>)
+  escaped=escaped.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   var mainHtml,verseHtml;
   if(escaped.includes('---')){
     const parts=escaped.split('---');
