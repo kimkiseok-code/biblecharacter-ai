@@ -1402,8 +1402,13 @@ function applyVersePlain(html){
 }
 function formatReply(text){
   let escaped=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  // 마크다운 볼드 변환 (**텍스트** → <strong>)
-  escaped=escaped.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  // 마크다운 제거/변환 (순서 중요)
+  escaped=escaped.replace(/^#{1,6}\s+/gm,'');                      // # 제목 제거
+  escaped=escaped.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>'); // **볼드** → <strong>
+  escaped=escaped.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>'); // 혹시 남은 것 재처리
+  escaped=escaped.replace(/\*([^*]+?)\*/g,'$1');                   // *이탤릭* 제거
+  escaped=escaped.replace(/\*/g,'');                               // 남은 * 전체 제거
+  escaped=escaped.replace(/^&gt;\s?/gm,'');                        // > 인용구 제거
   var mainHtml,verseHtml;
   if(escaped.includes('---')){
     const parts=escaped.split('---');
