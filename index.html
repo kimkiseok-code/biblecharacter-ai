@@ -116,6 +116,19 @@ window.doTestLogin = function() {
   }
 };
 
+window.doTestLogin2 = function() {
+  var id = document.getElementById('testLoginId2').value;
+  var pw = document.getElementById('testLoginPw2').value;
+  if(id === 'nicepay' && pw === 'test1234') {
+    var user = { name: '테스트계정', email: 'nicepay-test@biblecharacter.ai' };
+    localStorage.setItem('bca_user', JSON.stringify(user));
+    window._currentUser = user;
+    window.location.reload();
+  } else {
+    alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+  }
+};
+
 window.startPayment = function(plan) {
   if(!window._currentUser) {
     alert('로그인이 필요합니다.');
@@ -721,6 +734,14 @@ textarea:focus { border-color:var(--gold); }
       Google로 계속하기
     </button>
     <button onclick="document.getElementById('loginPromptModal').style.display='none'" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">나중에 하기</button>
+    <div style="margin-top:10px;">
+      <a href="#" onclick="document.getElementById('testLoginBox2').style.display='flex';return false;" style="font-size:11px;color:var(--ink-soft);text-decoration:underline;">테스트 계정으로 로그인</a>
+    </div>
+    <div id="testLoginBox2" style="display:none;margin-top:12px;flex-direction:column;gap:8px;">
+      <input id="testLoginId2" type="text" placeholder="아이디" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(184,149,42,0.4);background:white;color:var(--ink);font-size:13px;font-family:'Pretendard',sans-serif;">
+      <input id="testLoginPw2" type="password" placeholder="비밀번호" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(184,149,42,0.4);background:white;color:var(--ink);font-size:13px;font-family:'Pretendard',sans-serif;">
+      <button onclick="doTestLogin2()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--gold);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;font-family:'Pretendard',sans-serif;">로그인</button>
+    </div>
   </div>
 </div>
 
