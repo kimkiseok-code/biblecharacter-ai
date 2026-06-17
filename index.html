@@ -130,9 +130,9 @@ window.doTestLogin2 = function() {
 };
 
 window.startPayment = function(plan) {
+  // 로그인 안 된 경우 임시 게스트 정보로 결제 진행 (카드사 테스트 편의)
   if(!window._currentUser) {
-    alert('로그인이 필요합니다.');
-    return;
+    window._currentUser = { name: '게스트', email: 'guest@biblecharacter.ai' };
   }
   const amount = plan === 'basic' ? 2900 : 4900;
   const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직 1개월 이용권' : 'BibleCharacter.AI 프리미엄 1개월 이용권';
