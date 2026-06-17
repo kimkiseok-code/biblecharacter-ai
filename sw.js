@@ -1,4 +1,4 @@
-const CACHE = 'bca-v15';
+const CACHE = 'bca-v16';
 const ASSETS = ['/', '/index.html', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
