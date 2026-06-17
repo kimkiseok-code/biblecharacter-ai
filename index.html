@@ -130,9 +130,12 @@ window.doTestLogin2 = function() {
 };
 
 window.startPayment = function(plan) {
-  // 로그인 안 된 경우 임시 게스트 정보로 결제 진행 (카드사 테스트 편의)
+  // 비로그인 상태면 구글 로그인 유도, 로그인 후 자동으로 결제 이어가도록 의도 저장
   if(!window._currentUser) {
-    window._currentUser = { name: '게스트', email: 'guest@biblecharacter.ai' };
+    localStorage.setItem('bca_pending_payment', plan);
+    document.getElementById('limitModal').style.display='none';
+    document.getElementById('loginPromptModal').style.display='flex';
+    return;
   }
   const amount = plan === 'basic' ? 2900 : 4900;
   const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직 1개월 이용권' : 'BibleCharacter.AI 프리미엄 1개월 이용권';
@@ -1077,6 +1080,13 @@ function startApp(){
   var wo = document.getElementById('welcomeOverlay');
   if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
   window._startAppAfterLogin = startApp;
+
+  // 로그인 후 결제 이어가기
+  var pendingPlan = localStorage.getItem('bca_pending_payment');
+  if(pendingPlan && window._currentUser) {
+    localStorage.removeItem('bca_pending_payment');
+    setTimeout(function(){ window.startPayment(pendingPlan); }, 300);
+  }
 }
 
 function updateUserInfo(){
