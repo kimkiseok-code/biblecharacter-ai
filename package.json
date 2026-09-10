@@ -1,0 +1,13 @@
+{
+  "name": "biblecharacter-ai",
+  "version": "1.0.0",
+  "description": "Bible Character AI Mentoring",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "lint": "echo 'No linter configured'"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^1.1.0"
+  }
+}
