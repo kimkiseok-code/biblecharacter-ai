@@ -1,5 +1,8 @@
 // api/chat.js — 대화 요청 (서버에서 남은 횟수 확인 후 Claude 호출)
-import { getUser, getQuota, tryConsume, refund, clientIp } from './_lib.js';
+import {
+  getUser, getQuota, tryConsume, refund, clientIp,
+  isFreeTier, tryConsumeFreeCap, refundFreeCap, MODEL_FREE, MODEL_PAID,
+} from './_lib.js';
 
 const MAX_MESSAGES = 20;        // 대화 맥락은 최근 20개까지만
 const MAX_MESSAGE_CHARS = 2000; // 한 메시지 최대 길이
@@ -10,6 +13,12 @@ export default async function handler(req, res) {
 
   let quota = null;
   let consumed = false;
+  let capConsumed = false;
+  async function undo() {
+    if (consumed && quota) { try { await refund(quota); } catch (e) {} consumed = false; }
+    if (capConsumed) { try { await refundFreeCap(); } catch (e) {} capConsumed = false; }
+  }
+
   try {
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(500).json({ error: 'API 키가 설정되지 않았습니다' });
@@ -32,7 +41,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '잘못된 요청입니다' });
     }
 
-    // 2. 누구인지 확인 → 한도 확인 → 1회 차감
+    // 2. 누구인지 확인 → 개인 한도 확인 → 1회 차감
     const authHeader = req.headers['authorization'] || '';
     const user = getUser(req);
     if (authHeader && !user) {
@@ -49,7 +58,21 @@ export default async function handler(req, res) {
     }
     consumed = true;
 
-    // 3. Claude 호출
+    // 3. 무료 사용자는 사이트 전체 하루 상한도 확인 (이용권 회원·관리자는 제외)
+    const free = isFreeTier(quota);
+    if (free) {
+      if (!(await tryConsumeFreeCap())) {
+        await undo();
+        return res.status(402).json({
+          error: '오늘 준비된 무료 대화가 모두 소진되었습니다',
+          code: 'DAILY_CAP',
+          usage: { tier: quota.tier, used: c.used - 1, limit: quota.limit },
+        });
+      }
+      capConsumed = true;
+    }
+
+    // 4. Claude 호출 (무료: Haiku / 이용권·관리자: Sonnet)
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -58,7 +81,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: free ? MODEL_FREE : MODEL_PAID,
         max_tokens: 1200,
         system,
         messages: trimmed,
@@ -67,8 +90,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     if (!response.ok) {
-      await refund(quota); // 실패한 대화는 횟수에서 빼지 않음
-      consumed = false;
+      await undo(); // 실패한 대화는 횟수에서 빼지 않음
       return res.status(502).json({ error: data.error?.message || 'AI 응답 오류' });
     }
 
@@ -78,7 +100,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('chat error:', error);
-    if (consumed && quota) { try { await refund(quota); } catch (e) {} }
+    await undo();
     return res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 }

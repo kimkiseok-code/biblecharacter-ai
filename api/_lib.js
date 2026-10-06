@@ -9,6 +9,12 @@ export const PLANS = {
 };
 export const FREE_MONTHLY_LIMIT = 3;   // 로그인 무료 회원: 매달 3회
 export const GUEST_MONTHLY_LIMIT = 3;  // 비로그인: IP당 매달 3회
+// 사이트 전체 무료 대화(비로그인+무료회원 합계) 하루 상한. 이용권 회원·관리자는 제외
+export const FREE_DAILY_CAP = parseInt(process.env.FREE_DAILY_CAP || '50', 10);
+
+// 답변 모델: 무료는 저렴한 Haiku, 이용권 회원·관리자는 더 깊이 있는 Sonnet
+export const MODEL_FREE = process.env.MODEL_FREE || 'claude-haiku-4-5-20251001';
+export const MODEL_PAID = process.env.MODEL_PAID || 'claude-sonnet-4-6';
 const SESSION_DAYS = 30;               // 로그인 유지 기간
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'onsign@gmail.com')
@@ -166,6 +172,36 @@ export async function tryConsume(quota) {
 // API 오류 등으로 대화가 실패하면 차감한 1회를 되돌림
 export async function refund(quota) {
   if (quota.key) await redis('DECR', quota.key);
+}
+
+export function isFreeTier(quota) {
+  return quota.tier === 'guest' || quota.tier === 'free';
+}
+
+// ───────── 사이트 전체 무료 대화 하루 상한 ─────────
+function kstDayKey(ts = Date.now()) {
+  const d = new Date(ts + 9 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+const freeCapKey = () => `freecap:${kstDayKey()}`;
+
+export async function getFreeToday() {
+  return parseInt((await redis('GET', freeCapKey())) || '0', 10);
+}
+
+export async function tryConsumeFreeCap() {
+  const key = freeCapKey();
+  const n = await redis('INCR', key);
+  if (n === 1) await redis('EXPIRE', key, String(2 * 86400));
+  if (n > FREE_DAILY_CAP) {
+    await redis('DECR', key);
+    return false;
+  }
+  return true;
+}
+
+export async function refundFreeCap() {
+  await redis('DECR', freeCapKey());
 }
 
 export function clientIp(req) {

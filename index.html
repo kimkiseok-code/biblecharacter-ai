@@ -724,7 +724,7 @@ textarea:focus { border-color:var(--gold); }
     <div style="font-size:28px;margin-bottom:8px;">✦</div>
     <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 14px;border-radius:2px;"></div>
     <div id="limitTitle" style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 달 무료 대화를 모두 사용하셨어요</div>
-    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏</div>
+    <div id="limitDesc" style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏</div>
 
     <div id="refundAgreeBox" style="background:white;border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:10px 12px;margin-bottom:16px;text-align:left;font-family:'Pretendard',sans-serif;font-size:11.5px;color:var(--ink-mid);line-height:1.7;">
       디지털 이용권 특성상 <strong>결제 후 대화를 1회라도 이용하면 청약철회(환불)가 제한</strong>됩니다. 미사용 시 결제일로부터 7일 이내 환불 가능합니다. 자세한 내용은 <a href="/refund.html" target="_blank" style="color:var(--gold);">환불정책</a>을 확인해 주세요.
@@ -740,6 +740,7 @@ textarea:focus { border-color:var(--gold); }
           <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직 1개월 이용권</span>
           <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">2,900원</span>
         </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:#8A6A10;margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 50회 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
         <button onclick="startPayment('basic')" style="margin-top:10px;width:100%;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.4);border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:600;color:var(--ink-mid);cursor:pointer;">베이직 이용권 구매</button>
       </div>
@@ -750,6 +751,7 @@ textarea:focus { border-color:var(--gold); }
           <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄 1개월 이용권</span>
           <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원</span>
         </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 횟수 무제한 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
         <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 이용권 구매</button>
       </div>
@@ -1301,12 +1303,17 @@ function askAgain(){
   exitAnswerMode();
   document.getElementById('msgInput').focus();
 }
-function showLimitModal(tier){
+function showLimitModal(tier, reason){
   var t=document.getElementById('limitTitle');
-  if(t){
+  var d=document.getElementById('limitDesc');
+  if(reason==='cap'){
+    t.textContent='오늘 준비된 무료 대화가 모두 소진됐어요';
+    d.innerHTML='무료 대화는 매일 자정에 다시 열립니다.<br>지금 바로 이어가시려면 이용권을 선택해 주세요 🙏';
+  } else {
     t.textContent = tier==='basic'
       ? '이용권의 대화 50회를 모두 사용하셨어요'
       : '이번 달 무료 대화를 모두 사용하셨어요';
+    d.innerHTML='말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏';
   }
   document.getElementById('limitModal').style.display='flex';
 }
@@ -1502,6 +1509,7 @@ async function sendMsg(){
       undoLastUserMsg();
       if(data.usage) renderUsage(data.usage);
       if(data.code==='GUEST_LIMIT') document.getElementById('loginPromptModal').style.display='flex';
+      else if(data.code==='DAILY_CAP') showLimitModal(data.usage && data.usage.tier, 'cap');
       else showLimitModal(data.usage && data.usage.tier);
       return;
     }

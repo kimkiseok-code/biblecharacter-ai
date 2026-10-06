@@ -1,5 +1,5 @@
 // api/admin-payments.js — (관리자 전용) 최근 결제 목록 + 각 결제의 사용 횟수
-import { getUser, isAdmin, redis, getJSON } from './_lib.js';
+import { getUser, isAdmin, redis, getJSON, getFreeToday, FREE_DAILY_CAP } from './_lib.js';
 
 export default async function handler(req, res) {
   try {
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         expiresAt: plan && plan.orderId === orderId ? plan.expiresAt : null,
       });
     }
-    res.status(200).json({ payments: list });
+    res.status(200).json({ payments: list, freeToday: await getFreeToday(), freeCap: FREE_DAILY_CAP });
   } catch (e) {
     console.error('admin-payments error:', e);
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
