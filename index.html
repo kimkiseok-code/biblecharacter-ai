@@ -1104,6 +1104,7 @@ const OT_ORDER=['noah','abraham','sarah','joseph','moses','joshua','gideon','han
 const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 
 let currentChar='', messages=[], isLoading=false;
+let convId=0; // 인물을 바꾸거나 처음으로 가면 증가 → 늦게 온 답변 구분용
 
 function startApp(){
   buildCharBars();
@@ -1148,6 +1149,7 @@ function buildCharBars(){
   }
 }
 function selectChar(id){
+  convId++; resetLoading();
   currentChar=id; messages=[]; hideSaveBar();
   var qb=document.getElementById('quickBtns'); if(qb) qb.classList.remove('open');
   var tb=document.getElementById('quickToggleBtn'); if(tb) tb.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
@@ -1260,6 +1262,7 @@ function enterChatScreen(){
   if(mini) mini.textContent=' · '+(CHARS[currentChar]?CHARS[currentChar].icon+' '+CHARS[currentChar].name:'');
 }
 function goSelectScreen(){
+  convId++; resetLoading();
   document.querySelector('.app').classList.remove('chat-screen');
   document.querySelector('.app').classList.remove('answer-mode');
   exitAnswerMode();
@@ -1458,8 +1461,15 @@ function formatReply(text){
   return mainHtml;
 }
 function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}}
+// 진행 중이던 대화 요청 표시를 정리 (인물 변경·처음으로 이동 시)
+function resetLoading(){
+  isLoading=false;
+  var sb=document.getElementById('sendBtn'); if(sb) sb.disabled=false;
+  removeTyping();
+}
 async function sendMsg(){
   if(isLoading)return;
+  const myConv=convId; // 이 질문을 보낸 대화
   const input=document.getElementById('msgInput');
   const text=input.value.trim(); if(!text)return;
 
@@ -1484,6 +1494,8 @@ async function sendMsg(){
       body:JSON.stringify({system:CHARS[currentChar].system,messages:messages})
     });
     const data=await res.json().catch(()=>({}));
+    // 답이 오는 사이 인물을 바꾸거나 처음으로 갔으면 늦게 온 답은 버림
+    if(myConv!==convId) return;
 
     if(res.status===401){ undoLastUserMsg(); handleSessionExpired(); return; }
     if(res.status===402){
@@ -1501,13 +1513,16 @@ async function sendMsg(){
     enterAnswerMode();
     if(data.usage) renderUsage(data.usage);
   }catch(err){
+    if(myConv!==convId) return;
     removeTyping();
     const errDiv=document.createElement('div'); errDiv.className='msg msg-ai';
     errDiv.innerHTML='<div class="avatar">⚠️</div><div class="bubble"><div class="error-msg">오류: '+err.message+'</div></div>';
     document.getElementById('chatArea').appendChild(errDiv);
     document.getElementById('chatArea').scrollTop=99999; messages.pop();
   }finally{
-    isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
+    if(myConv===convId){
+      isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
+    }
   }
 }
 // 앱 시작

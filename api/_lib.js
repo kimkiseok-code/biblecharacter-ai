@@ -136,9 +136,14 @@ export async function getQuota({ email, ip }) {
   return {
     tier: 'guest',
     limit: GUEST_MONTHLY_LIMIT,
-    key: `usage:guest:${ip || 'unknown'}:${kstMonthKey()}`,
+    key: `usage:guest:${hashIp(ip)}:${kstMonthKey()}`,
     ttl: 40 * 86400,
   };
+}
+
+// IP 원문은 저장하지 않고 되돌릴 수 없는 값으로 바꿔서 사용
+function hashIp(ip) {
+  return crypto.createHmac('sha256', secret()).update('ip:' + (ip || 'unknown')).digest('base64url').slice(0, 22);
 }
 
 export async function getUsed(quota) {

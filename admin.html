@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>결제 관리 — BibleCharacter.AI</title>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --gold: #B8952A; --gold-pale: #F7F0D8; --parchment: #FAF6EC;
+  --ink: #2A2318; --ink-mid: #5A4E3A; --ink-soft: #8A7A60;
+  --border: rgba(184,149,42,0.25); --red: #B5533F; --green: #3E8E4E;
+}
+body { background: #1A1610; font-family: 'Pretendard', sans-serif; color: var(--ink); padding: 24px 16px 60px; }
+.wrap { max-width: 720px; margin: 0 auto; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 12px; }
+h1 { color: #E8D48A; font-size: 18px; font-weight: 700; }
+h1 span { display: block; color: var(--ink-soft); font-size: 12px; font-weight: 400; margin-top: 2px; }
+.btn { border: 1px solid var(--border); background: var(--gold-pale); color: var(--ink-mid); border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--gold); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.ghost { background: transparent; color: #E8D48A; border-color: rgba(184,149,42,.4); }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.stat { background: var(--parchment); border-radius: 12px; padding: 12px; }
+.stat b { display: block; font-size: 18px; color: var(--ink); }
+.stat small { font-size: 11.5px; color: var(--ink-soft); }
+.card { background: var(--parchment); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+.card.cancelled { opacity: .65; }
+.row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.email { font-weight: 700; font-size: 14px; word-break: break-all; }
+.meta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; line-height: 1.6; }
+.amount { font-weight: 700; color: var(--gold); white-space: nowrap; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.badge { font-size: 11.5px; font-weight: 600; border-radius: 20px; padding: 3px 10px; background: var(--gold-pale); color: var(--ink-mid); }
+.badge.ok { background: rgba(62,142,78,.12); color: var(--green); }
+.badge.warn { background: rgba(181,83,63,.12); color: var(--red); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.note { font-size: 12px; color: var(--red); margin-top: 8px; }
+.empty, .msg { background: var(--parchment); border-radius: 14px; padding: 28px 18px; text-align: center; font-size: 14px; color: var(--ink-mid); line-height: 1.8; }
+.msg a { color: var(--gold); }
+.help { color: var(--ink-soft); font-size: 12px; line-height: 1.7; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>✦ 결제 관리<span>BibleCharacter.AI · 관리자 전용</span></h1>
+    <button class="btn ghost" onclick="load()">새로고침</button>
+  </header>
+  <div id="summary" class="summary" style="display:none"></div>
+  <div id="list"></div>
+  <p class="help">
+    · <b>환불 가능 표시</b>: 환불정책 기준(결제 후 7일 이내, 대화 0회 사용)에 맞는 결제입니다. 판단은 직접 하시면 됩니다.<br>
+    · <b>환불</b>: 나이스페이 결제를 전액 취소하고 앱 이용권도 회수합니다.<br>
+    · <b>이용권만 회수</b>: 나이스페이 관리자 화면에서 이미 취소한 경우에만 사용하세요. 돈은 돌려주지 않습니다.
+  </p>
+</div>
+
+<script>
+var DAY = 86400000;
+var session = null;
+try { var u = JSON.parse(localStorage.getItem('bca_user') || 'null'); session = u && u.session; } catch (e) {}
+
+function api(path, body) {
+  var opt = { headers: { Authorization: 'Bearer ' + session } };
+  if (body) { opt.method = 'POST'; opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  return fetch(path, opt).then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }); });
+}
+function fmt(ts) {
+  if (!ts) return '-';
+  var d = new Date(ts);
+  return d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+function won(n) { return n.toLocaleString('ko-KR') + '원'; }
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+
+function showMsg(html) {
+  document.getElementById('summary').style.display = 'none';
+  document.getElementById('list').innerHTML = '<div class="msg">' + html + '</div>';
+}
+
+function load() {
+  if (!session) { showMsg('관리자 계정으로 먼저 로그인해 주세요.<br><a href="/">BibleCharacter.AI 홈에서 로그인 →</a>'); return; }
+  document.getElementById('list').innerHTML = '<div class="msg">불러오는 중…</div>';
+  api('/api/admin-payments').then(function (d) {
+    if (d._status === 401) { showMsg('로그인이 만료되었습니다.<br><a href="/">홈에서 다시 로그인 →</a>'); return; }
+    if (d._status === 403) { showMsg('관리자 계정이 아닙니다.'); return; }
+    if (!d.payments) { showMsg(esc(d.error || '불러오지 못했습니다')); return; }
+    render(d.payments);
+  }).catch(function () { showMsg('네트워크 오류가 발생했습니다.'); });
+}
+
+function render(list) {
+  var paid = list.filter(function (p) { return p.status === 'paid'; });
+  var sum = paid.reduce(function (a, p) { return a + p.amount; }, 0);
+  var active = list.filter(function (p) { return p.active; }).length;
+  var s = document.getElementById('summary');
+  s.style.display = 'grid';
+  s.innerHTML =
+    '<div class="stat"><b>' + paid.length + '건</b><small>결제 (환불 제외)</small></div>' +
+    '<div class="stat"><b>' + won(sum) + '</b><small>결제 합계</small></div>' +
+    '<div class="stat"><b>' + active + '명</b><small>이용 중</small></div>';
+
+  if (!list.length) { document.getElementById('list').innerHTML = '<div class="empty">아직 결제 내역이 없습니다.</div>'; return; }
+
+  document.getElementById('list').innerHTML = list.map(function (p) {
+    var days = p.paidAt ? Math.floor((Date.now() - p.paidAt) / DAY) : 0;
+    var refundable = p.status === 'paid' && p.used === 0 && days < 7;
+    var badges = [];
+    if (p.status === 'cancelled') badges.push('<span class="badge warn">환불됨 · ' + fmt(p.cancelledAt) + '</span>');
+    else if (p.active) badges.push('<span class="badge ok">이용 중 · ' + new Date(p.expiresAt).toLocaleDateString('ko-KR') + '까지</span>');
+    else badges.push('<span class="badge">이용기간 종료</span>');
+    badges.push('<span class="badge">사용 ' + p.used + (p.plan === 'basic' ? '/50' : '') + '회</span>');
+    badges.push('<span class="badge">결제 ' + days + '일 경과</span>');
+    if (refundable) badges.push('<span class="badge ok">환불 가능</span>');
+
+    var actions = p.status === 'paid'
+      ? '<div class="actions">' +
+          '<button class="btn danger" onclick="refund(\'' + p.orderId + '\', false, this)">환불 (' + won(p.amount) + ' 취소)</button>' +
+          '<button class="btn" onclick="refund(\'' + p.orderId + '\', true, this)">이용권만 회수</button>' +
+        '</div>'
+      : (p.cancelReason ? '<div class="meta">사유: ' + esc(p.cancelReason) + '</div>' : '');
+
+    return '<div class="card' + (p.status === 'cancelled' ? ' cancelled' : '') + '" id="c_' + p.orderId + '">' +
+      '<div class="row"><div><div class="email">' + esc(p.email) + '</div>' +
+      '<div class="meta">' + (p.plan === 'premium' ? '프리미엄' : '베이직') + ' · ' + fmt(p.paidAt) + '<br>' + esc(p.orderId) + '</div></div>' +
+      '<div class="amount">' + won(p.amount) + '</div></div>' +
+      '<div class="badges">' + badges.join('') + '</div>' + actions +
+      '<div class="note" id="n_' + p.orderId + '"></div></div>';
+  }).join('');
+}
+
+function refund(orderId, revokeOnly, btn) {
+  var q = revokeOnly
+    ? '나이스페이에서 이미 취소하셨나요?\n이 결제의 이용권만 회수합니다. (돈은 돌려주지 않습니다)'
+    : '이 결제를 전액 취소하고 이용권을 회수합니다.\n되돌릴 수 없습니다. 진행할까요?';
+  if (!confirm(q)) return;
+  var reason = prompt('환불 사유 (고객에게는 보이지 않음)', '고객 요청에 의한 환불');
+  if (reason === null) return;
+  var card = document.getElementById('c_' + orderId);
+  card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+  btn.textContent = '처리 중…';
+  api('/api/admin-refund', { orderId: orderId, reason: reason, revokeOnly: revokeOnly }).then(function (d) {
+    if (d.ok) { alert(revokeOnly ? '이용권을 회수했습니다.' : '환불(결제 취소)과 이용권 회수를 완료했습니다.'); load(); return; }
+    document.getElementById('n_' + orderId).textContent = (d.error || '처리하지 못했습니다') + (d.hint ? ' — ' + d.hint : '');
+    card.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+    btn.textContent = revokeOnly ? '이용권만 회수' : '다시 시도';
+  }).catch(function () {
+    document.getElementById('n_' + orderId).textContent = '네트워크 오류 — 나이스페이 관리자 화면에서 취소 여부를 확인한 뒤 다시 시도하세요';
+    card.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+  });
+}
+
+load();
+</script>
+</body>
+</html>

@@ -48,10 +48,9 @@ export default async function handler(req, res) {
       expiresAt: addOneMonth(now),
     });
     await setJSON(`order:${orderId}`, { ...order, status: 'paid', tid, paidAt: now });
-    // 결제 이력 (환불 문의 대응용)
-    await redis('LPUSH', `payments:${order.email}`, JSON.stringify({
-      orderId, tid, plan: order.plan, amount: order.amount, paidAt: now,
-    }));
+    // 결제 목록 (관리자 페이지·환불용). 주문 상세는 order:{orderId}에 있음
+    await redis('LPUSH', 'payments:all', orderId);
+    await redis('LPUSH', `payments:${order.email}`, orderId);
 
     return res.redirect(303, `/payment-success.html?plan=${order.plan}`);
   } catch (err) {
