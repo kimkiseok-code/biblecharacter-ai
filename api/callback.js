@@ -1,4 +1,6 @@
 // api/callback.js — 구글 로그인 후 콜백 처리
+import { signSession } from './_lib.js';
+
 export default async function handler(req, res) {
   const { code, error } = req.query;
 
@@ -39,14 +41,12 @@ export default async function handler(req, res) {
       return res.redirect('/?login_error=no_email');
     }
 
-    // 3. 유저 정보를 간단한 토큰(base64)으로 인코딩해서 프론트로 전달
-    const payload = {
+    // 3. 유저 정보를 서명된 세션 토큰으로 만들어 프론트로 전달 (위조 불가)
+    const token = signSession({
       email: user.email,
       name: user.name || user.email.split('@')[0],
       picture: user.picture || '',
-      loginAt: Date.now(),
-    };
-    const token = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    });
 
     // 4. 프론트엔드로 리다이렉트 (토큰 포함)
     res.redirect(`/?bca_token=${token}`);

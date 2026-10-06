@@ -1,42 +1,84 @@
+// api/chat.js — 대화 요청 (서버에서 남은 횟수 확인 후 Claude 호출)
+import { getUser, getQuota, tryConsume, refund, clientIp } from './_lib.js';
+
+const MAX_MESSAGES = 20;        // 대화 맥락은 최근 20개까지만
+const MAX_MESSAGE_CHARS = 2000; // 한 메시지 최대 길이
+const MAX_SYSTEM_CHARS = 4000;
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  let quota = null;
+  let consumed = false;
   try {
-    const { system, messages } = req.body;
-    
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(500).json({ error: 'API 키가 설정되지 않았습니다' });
     }
 
+    // 1. 입력 검사 (과도하게 긴 요청으로 비용이 새지 않도록)
+    const { system, messages } = req.body || {};
+    if (typeof system !== 'string' || !system || system.length > MAX_SYSTEM_CHARS) {
+      return res.status(400).json({ error: '잘못된 요청입니다' });
+    }
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: '잘못된 요청입니다' });
+    }
+    const trimmed = messages.slice(-MAX_MESSAGES).map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m.content || '').slice(0, MAX_MESSAGE_CHARS),
+    }));
+    if (trimmed[0].role !== 'user') trimmed.shift();
+    if (!trimmed.length || trimmed[trimmed.length - 1].role !== 'user') {
+      return res.status(400).json({ error: '잘못된 요청입니다' });
+    }
+
+    // 2. 누구인지 확인 → 한도 확인 → 1회 차감
+    const authHeader = req.headers['authorization'] || '';
+    const user = getUser(req);
+    if (authHeader && !user) {
+      return res.status(401).json({ error: '로그인이 만료되었습니다. 다시 로그인해 주세요', code: 'SESSION_EXPIRED' });
+    }
+    quota = await getQuota({ email: user && user.email, ip: clientIp(req) });
+    const c = await tryConsume(quota);
+    if (!c.ok) {
+      return res.status(402).json({
+        error: '이용 가능한 횟수를 모두 사용했습니다',
+        code: quota.tier === 'guest' ? 'GUEST_LIMIT' : 'LIMIT',
+        usage: { tier: quota.tier, used: c.used, limit: quota.limit },
+      });
+    }
+    consumed = true;
+
+    // 3. Claude 호출
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1200,
-        system: system,
-        messages: messages
-      })
+        system,
+        messages: trimmed,
+      }),
     });
 
     const data = await response.json();
     if (!response.ok) {
-      return res.status(response.status).json({ 
-        error: data.error?.message || '알 수 없는 오류',
-        detail: data 
-      });
+      await refund(quota); // 실패한 대화는 횟수에서 빼지 않음
+      consumed = false;
+      return res.status(502).json({ error: data.error?.message || 'AI 응답 오류' });
     }
-    return res.status(200).json(data);
 
-  } catch (error) {
-    return res.status(500).json({ 
-      error: error.message,
-      stack: error.stack 
+    return res.status(200).json({
+      content: data.content,
+      usage: { tier: quota.tier, used: c.used, limit: quota.limit },
     });
+  } catch (error) {
+    console.error('chat error:', error);
+    if (consumed && quota) { try { await refund(quota); } catch (e) {} }
+    return res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
 }

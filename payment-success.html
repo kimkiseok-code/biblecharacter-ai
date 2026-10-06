@@ -23,46 +23,47 @@ body { background: #1A1610; display: flex; align-items: center; justify-content:
   <div class="icon">✦</div>
   <div class="divider"></div>
   <div class="title">결제가 완료됐어요!</div>
-  <div class="desc" id="desc">잠시만 기다려주세요...<br>결제를 확인하고 있습니다.</div>
+  <div class="desc" id="desc">잠시만 기다려 주세요...<br>이용권을 확인하고 있습니다.</div>
   <div class="loading" id="loading">처리 중...</div>
   <a href="/" class="btn" id="homeBtn" style="display:none;">말씀 멘토링 시작하기 🙏</a>
 </div>
 
 <script>
+// 이용권은 서버(/api/nicepay-confirm)에서 이미 부여됨 → 여기서는 결과만 확인해서 보여줌
 (async function() {
-  const params = new URLSearchParams(window.location.search);
-  const paymentKey = params.get('paymentKey');
-  const orderId = params.get('orderId');
-  const amount = parseInt(params.get('amount'));
+  const desc = document.getElementById('desc');
+  const loading = document.getElementById('loading');
+  const homeBtn = document.getElementById('homeBtn');
+  const plan = new URLSearchParams(window.location.search).get('plan');
 
+  function done(html) {
+    desc.innerHTML = html;
+    loading.style.display = 'none';
+    homeBtn.style.display = 'block';
+  }
+
+  let tier = plan;
+  let expiresAt = null;
   try {
-    const res = await fetch('/api/payment-confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentKey, orderId, amount }),
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      // 플랜 정보 localStorage에 저장
-      localStorage.setItem('bca_plan', data.plan);
-      localStorage.setItem('bca_plan_month', data.month);
-      const limit = data.plan === 'basic' ? 50 : 99999;
-      localStorage.setItem('bca_limit', limit);
-
-      document.getElementById('desc').innerHTML =
-        data.plan === 'premium'
-          ? '프리미엄 플랜이 활성화됐어요!<br>이제 무제한으로 말씀을 나눌 수 있습니다. 🙏'
-          : '베이직 플랜이 활성화됐어요!<br>이번 달 50회 대화를 이용하실 수 있습니다. 🙏';
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('homeBtn').style.display = 'block';
-    } else {
-      document.getElementById('desc').textContent = '결제 확인 중 오류가 발생했습니다. 고객센터로 문의해주세요.';
-      document.getElementById('loading').style.display = 'none';
+    const saved = JSON.parse(localStorage.getItem('bca_user') || 'null');
+    const headers = saved && saved.session ? { Authorization: 'Bearer ' + saved.session } : {};
+    const res = await fetch('/api/me', { headers });
+    if (res.ok) {
+      const me = await res.json();
+      if (me.tier === 'basic' || me.tier === 'premium') { tier = me.tier; expiresAt = me.expiresAt; }
     }
-  } catch(e) {
-    document.getElementById('desc').textContent = '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-    document.getElementById('loading').style.display = 'none';
+  } catch (e) {}
+
+  const until = expiresAt
+    ? '<br><span style="font-size:12px;color:#8A7A60;">이용기간: ' + new Date(expiresAt).toLocaleDateString('ko-KR') + '까지</span>'
+    : '';
+
+  if (tier === 'premium') {
+    done('프리미엄 이용권이 활성화됐어요!<br>이용기간 동안 횟수 제한 없이 말씀을 나눌 수 있습니다. 🙏' + until);
+  } else if (tier === 'basic') {
+    done('베이직 이용권이 활성화됐어요!<br>이용기간 동안 50회 대화를 이용하실 수 있습니다. 🙏' + until);
+  } else {
+    done('결제는 완료됐지만 이용권 확인이 늦어지고 있어요.<br>잠시 후 홈에서 다시 확인해 주시고, 계속 안 되면 010-5469-0568로 문의해 주세요.');
   }
 })();
 </script>

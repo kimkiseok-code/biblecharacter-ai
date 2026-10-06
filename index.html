@@ -23,71 +23,103 @@
 </script>
 
 <script>
-// 로그인 상태 확인 + 비로그인 3회 무료 체험
+// 로그인 상태 확인 (서명된 세션 사용) + 사용량은 서버에서 조회
 (function() {
   var saved = localStorage.getItem('bca_user');
   if (saved) {
-    try { window._currentUser = JSON.parse(saved); } catch(e) { localStorage.removeItem('bca_user'); }
+    try {
+      var u = JSON.parse(saved);
+      // 예전 방식(서명 없는) 로그인 정보는 무효 → 다시 로그인 필요
+      if (u && u.session) window._currentUser = u;
+      else localStorage.removeItem('bca_user');
+    } catch(e) { localStorage.removeItem('bca_user'); }
   }
   var params = new URLSearchParams(window.location.search);
   var token = params.get('bca_token');
   if (token) {
-    fetch('/api/verify?token=' + token)
+    window.history.replaceState({}, '', '/');
+    fetch('/api/verify?token=' + encodeURIComponent(token))
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        if(user && user.email) {
+        if(user && user.email && user.session) {
           localStorage.setItem('bca_user', JSON.stringify(user));
           window._currentUser = user;
-          var ui = document.getElementById('userInfo');
-if(ui) { ui.style.display='flex'; }
-var up = document.getElementById('userPhoto');
-if(up && user.picture) { up.src=user.picture; up.style.display='block'; }
-var un = document.getElementById('userName');
-if(un) un.textContent = user.name || user.email;
-updateUsageDisplay();
-          window.history.replaceState({}, '', '/');
+          showUserHeader();
           var lm = document.getElementById('loginPromptModal');
           if(lm) lm.style.display='none';
-          var countEl = document.getElementById('usageCount');
-          if(countEl) countEl.style.display='inline';
-          updateUsageDisplay();
+          refreshUsage();
+          // 로그인 전에 누른 구매 버튼이 있으면 이어서 결제
+          var pendingPlan = localStorage.getItem('bca_pending_payment');
+          if(pendingPlan) {
+            localStorage.removeItem('bca_pending_payment');
+            setTimeout(function(){ window.startPayment(pendingPlan, true); }, 300);
+          }
         }
       }).catch(function(){});
   }
   document.addEventListener('DOMContentLoaded', function() {
     var ls = document.getElementById('loginScreen');
     if(ls) ls.style.display='none';
-    updateUsageDisplay();
+    showUserHeader();
+    refreshUsage();
   });
 })();
 
-window._checkGuestLimit = function() {
-  if(window._currentUser) return true;
-  if(localStorage.getItem('bca_guest_locked') === 'true') {
-    document.getElementById('loginPromptModal').style.display='flex';
-    return false;
+// 서버 API 호출 시 로그인 세션을 함께 보냄
+function authHeaders(extra) {
+  var h = extra || {};
+  if(window._currentUser && window._currentUser.session) {
+    h['Authorization'] = 'Bearer ' + window._currentUser.session;
   }
-  var count = parseInt(localStorage.getItem('bca_guest_count') || '0');
-  if(count >= 3) {
-    localStorage.setItem('bca_guest_locked', 'true');
-    document.getElementById('loginPromptModal').style.display='flex';
-    return false;
-  }
-  localStorage.setItem('bca_guest_count', count + 1);
-  return true;
-};
+  return h;
+}
 
-function updateUsageDisplay() {
-  var countEl = document.getElementById('usageCount');
-  if(!countEl) return;
-  if(window._currentUser) {
-    var month = new Date().getFullYear()+'_'+(new Date().getMonth()+1);
-var used = parseInt(localStorage.getItem('bca_usage_'+month) || '0');
-    countEl.textContent = '무료 ' + used + '/3회 사용';
-    countEl.style.display = 'inline';
-  } else {
-    countEl.style.display = 'none';
-  }
+// 세션이 만료되었을 때: 로그아웃 처리 후 로그인 안내
+function handleSessionExpired() {
+  localStorage.removeItem('bca_user');
+  window._currentUser = null;
+  var ui = document.getElementById('userInfo');
+  if(ui) ui.style.display = 'none';
+  var lm = document.getElementById('loginPromptModal');
+  if(lm) lm.style.display = 'flex';
+}
+
+function showUserHeader() {
+  var user = window._currentUser;
+  if(!user) return;
+  var ui = document.getElementById('userInfo');
+  if(ui) ui.style.display = 'flex';
+  var up = document.getElementById('userPhoto');
+  if(up && user.picture) { up.src = user.picture; up.style.display = 'block'; }
+  var un = document.getElementById('userName');
+  if(un) un.textContent = user.name || user.email;
+}
+
+// 헤더의 사용량 표시 (u = 서버가 돌려준 {tier, used, limit})
+function renderUsage(u) {
+  var el = document.getElementById('usageCount');
+  if(!el || !u) return;
+  window._usage = u;
+  if(u.tier === 'guest') { el.style.display = 'none'; return; }
+  var text;
+  if(u.tier === 'admin') text = '👑 관리자 모드';
+  else if(u.tier === 'premium') text = '프리미엄 · 무제한';
+  else if(u.tier === 'basic') text = '베이직 ' + u.used + '/' + u.limit + '회';
+  else text = '무료 ' + u.used + '/' + u.limit + '회 사용';
+  el.textContent = text;
+  el.style.display = 'inline';
+  el.style.color = (u.tier === 'admin') ? '#B8952A'
+    : (u.limit !== null && u.used >= u.limit) ? '#C07060' : '#4CAF50';
+}
+
+function refreshUsage() {
+  fetch('/api/me', { headers: authHeaders() })
+    .then(function(r){
+      if(r.status === 401) { handleSessionExpired(); return null; }
+      return r.json();
+    })
+    .then(function(u){ if(u && u.tier) renderUsage(u); })
+    .catch(function(){});
 }
 
 window.toggleUserMenu = function() {
@@ -120,10 +152,6 @@ window.startPayment = function(plan, skipAgree) {
     document.getElementById('loginPromptModal').style.display='flex';
     return;
   }
-  const amount = plan === 'basic' ? 2900 : 4900;
-  const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직 1개월 이용권' : 'BibleCharacter.AI 프리미엄 1개월 이용권';
-  const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
-  const clientKey = 'R2_6d7910cf70de46eba6ff4fbef76ebf5f';
 
   function loadNicepay(callback) {
     if(window.AUTHNICE) { callback(); return; }
@@ -133,25 +161,39 @@ window.startPayment = function(plan, skipAgree) {
     document.head.appendChild(script);
   }
 
-  loadNicepay(function() {
-    AUTHNICE.requestPay({
-      clientId: clientKey,
-      method: 'card',
-      orderId: orderId,
-      amount: amount,
-      goodsName: orderName,
-      buyerName: window._currentUser.name || window._currentUser.email,
-      buyerEmail: window._currentUser.email,
-      returnUrl: window.location.origin + '/api/nicepay-confirm',
-      fnError: function(result) {
-        alert('결제 오류: ' + result.msg);
-      }
-    });
-  });
+  // 1) 서버가 주문(금액·주문번호)을 먼저 확정 → 2) 나이스페이 결제창
+  fetch('/api/order', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ plan: plan })
+  })
+    .then(function(r){
+      if(r.status === 401) { handleSessionExpired(); return null; }
+      return r.json();
+    })
+    .then(function(order){
+      if(!order) return;
+      if(!order.orderId) { alert(order.error || '주문을 만들 수 없습니다. 잠시 후 다시 시도해 주세요.'); return; }
+      loadNicepay(function() {
+        AUTHNICE.requestPay({
+          clientId: order.clientId,
+          method: 'card',
+          orderId: order.orderId,
+          amount: order.amount,
+          goodsName: order.goodsName,
+          buyerName: window._currentUser.name || window._currentUser.email,
+          buyerEmail: window._currentUser.email,
+          returnUrl: window.location.origin + '/api/nicepay-confirm',
+          fnError: function(result) {
+            alert('결제 오류: ' + result.msg);
+          }
+        });
+      });
+    })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); });
 };
   window.doLogout = function() {
   localStorage.removeItem('bca_user');
-  localStorage.setItem('bca_guest_locked', 'true');
   window._currentUser = null;
   var ui = document.getElementById('userInfo');
   if(ui) ui.style.display = 'none';
@@ -681,7 +723,7 @@ textarea:focus { border-color:var(--gold); }
   <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px 24px;max-width:380px;width:100%;text-align:center;">
     <div style="font-size:28px;margin-bottom:8px;">✦</div>
     <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 14px;border-radius:2px;"></div>
-    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 이용권의 무료 횟수를 다 쓰셨어요</div>
+    <div id="limitTitle" style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 달 무료 대화를 모두 사용하셨어요</div>
     <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏</div>
 
     <div id="refundAgreeBox" style="background:white;border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:10px 12px;margin-bottom:16px;text-align:left;font-family:'Pretendard',sans-serif;font-size:11.5px;color:var(--ink-mid);line-height:1.7;">
@@ -1064,26 +1106,11 @@ const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 let currentChar='', messages=[], isLoading=false;
 
 function startApp(){
-  buildCharBars(); initUsage(); updateUserInfo();
+  buildCharBars();
   var wo = document.getElementById('welcomeOverlay');
   if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
   window._startAppAfterLogin = startApp;
-
-  // 로그인 후 결제 이어가기
-  var pendingPlan = localStorage.getItem('bca_pending_payment');
-  if(pendingPlan && window._currentUser) {
-    localStorage.removeItem('bca_pending_payment');
-    setTimeout(function(){ window.startPayment(pendingPlan, true); }, 300);
-  }
-}
-
-function updateUserInfo(){
-  var user = window._currentUser;
-  if(!user) return;
-  var photo = document.getElementById('userPhoto');
-  var name = document.getElementById('userName');
-  if(photo && user.photoURL){ photo.src=user.photoURL; photo.style.display='block'; }
-  if(name) name.textContent = user.displayName ? user.displayName.split(' ')[0] : '';
+  // 로그인 직후 결제 이어가기는 상단 로그인 처리 스크립트에서 함
 }
 
 function showUserMenu(){
@@ -1118,20 +1145,6 @@ function buildCharBars(){
       btn.addEventListener('click',function(){selectChar(id);enterChatScreen();});
       ntBar.appendChild(btn);
     });
-  }
-}
-function initUsage(){
-  // URL에 ?admin=asadal 이면 관리자 모드 활성화
-  var params=new URLSearchParams(window.location.search);
-  if(params.get('admin')==='asadal'){
-    localStorage.setItem('bca_admin','true');
-  }
-  var isAdmin=localStorage.getItem('bca_admin')==='true'||(window._currentUser&&window._currentUser.email==='onsign@gmail.com');
-  if(isAdmin){
-    updateUsageDisplay(-1);
-  } else {
-    var u=parseInt(localStorage.getItem('bca_usage_'+getMonthKey())||'0');
-    updateUsageDisplay(u);
   }
 }
 function selectChar(id){
@@ -1285,29 +1298,13 @@ function askAgain(){
   exitAnswerMode();
   document.getElementById('msgInput').focus();
 }
-function getMonthKey(){
-  var d=new Date();
-  return d.getFullYear()+'_'+(d.getMonth()+1);
-}
-function updateUsageDisplay(count){
-  var plan = localStorage.getItem('bca_plan');
-var planMonth = localStorage.getItem('bca_plan_month');
-var currentMonth = getMonthKey();
-var LIMIT = (plan && planMonth === currentMonth)
-  ? (plan === 'premium' ? 99999 : 50)
-  : 3;
-  var el=document.getElementById('usageCount');
-  if(!el) return;
-  if(count===-1){
-    el.textContent='👑 관리자 모드';
-    el.style.color='#B8952A';
-  } else {
-    el.textContent='무료 '+count+'/'+LIMIT+'회 사용';
-    if(count>=LIMIT) el.style.color='#C07060';
-    else el.style.color='#4CAF50';
+function showLimitModal(tier){
+  var t=document.getElementById('limitTitle');
+  if(t){
+    t.textContent = tier==='basic'
+      ? '이용권의 대화 50회를 모두 사용하셨어요'
+      : '이번 달 무료 대화를 모두 사용하셨어요';
   }
-}
-function showLimitModal(){
   document.getElementById('limitModal').style.display='flex';
 }
 function closeLimitModal(){
@@ -1466,60 +1463,52 @@ async function sendMsg(){
   const input=document.getElementById('msgInput');
   const text=input.value.trim(); if(!text)return;
 
-  // 비로그인이면 게스트 3회 체크 먼저
-  if(!window._currentUser){
-    input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
-    isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
-    if(!window._checkGuestLimit()){
-      removeTyping();
-      isLoading=false; document.getElementById('sendBtn').disabled=false;
-      return;
-    }
-  } else {
-    // 로그인 후 무료 3회 제한 체크 (관리자는 무제한)
-    var LIMIT=3;
-    var isAdmin=localStorage.getItem('bca_admin')==='true'||window._currentUser.email==='onsign@gmail.com';
-    if(!isAdmin){
-      var usageKey='bca_usage_'+getMonthKey();
-      var usage=parseInt(localStorage.getItem(usageKey)||'0');
-      if(usage>=LIMIT){
-        showLimitModal();
-        return;
-      }
-    }
-    input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
-    isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+  input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
+  isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+
+  // 횟수가 막혔을 때: 방금 보낸 말은 화면·기록에서 되돌리고 입력창에 복원
+  function undoLastUserMsg(){
+    removeTyping();
+    messages.pop();
+    var ca=document.getElementById('chatArea');
+    var last=ca.lastElementChild;
+    if(last && last.classList.contains('msg-user')) last.remove();
+    input.value=text;
   }
+
   try{
+    // 남은 횟수 확인과 차감은 서버(/api/chat)에서 처리
     const res=await fetch('/api/chat',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:authHeaders({'Content-Type':'application/json'}),
       body:JSON.stringify({system:CHARS[currentChar].system,messages:messages})
     });
-    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error?.message||'API 오류 '+res.status);}
-    const data=await res.json();
+    const data=await res.json().catch(()=>({}));
+
+    if(res.status===401){ undoLastUserMsg(); handleSessionExpired(); return; }
+    if(res.status===402){
+      undoLastUserMsg();
+      if(data.usage) renderUsage(data.usage);
+      if(data.code==='GUEST_LIMIT') document.getElementById('loginPromptModal').style.display='flex';
+      else showLimitModal(data.usage && data.usage.tier);
+      return;
+    }
+    if(!res.ok) throw new Error(data.error||('API 오류 '+res.status));
+
     const reply=data.content?.[0]?.text||'응답을 받지 못했습니다.';
     messages.push({role:'assistant',content:reply});
     removeTyping(); addAiMsg(formatReply(reply));
     enterAnswerMode();
-    // 사용량 증가 (관리자는 스킵)
-    var isAdm=localStorage.getItem('bca_admin')==='true';
-    if(!isAdm){
-      var uk='bca_usage_'+getMonthKey();
-      var u=parseInt(localStorage.getItem(uk)||'0')+1;
-      localStorage.setItem(uk,u);
-      updateUsageDisplay(u);
-    } else {
-      updateUsageDisplay(-1);
-    }
+    if(data.usage) renderUsage(data.usage);
   }catch(err){
     removeTyping();
     const errDiv=document.createElement('div'); errDiv.className='msg msg-ai';
     errDiv.innerHTML='<div class="avatar">⚠️</div><div class="bubble"><div class="error-msg">오류: '+err.message+'</div></div>';
     document.getElementById('chatArea').appendChild(errDiv);
     document.getElementById('chatArea').scrollTop=99999; messages.pop();
+  }finally{
+    isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
   }
-  isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
 // 앱 시작
 document.addEventListener('DOMContentLoaded', function() { startApp(); });
