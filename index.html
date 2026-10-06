@@ -103,7 +103,7 @@ function renderUsage(u) {
   if(u.tier === 'guest') { el.style.display = 'none'; return; }
   var text;
   if(u.tier === 'admin') text = '👑 관리자 모드';
-  else if(u.tier === 'premium') text = '프리미엄 · 무제한';
+  else if(u.tier === 'premium') text = '프리미엄 · 오늘 ' + u.used + '/' + u.limit + '회';
   else if(u.tier === 'basic') text = '베이직 ' + u.used + '/' + u.limit + '회';
   else text = '무료 ' + u.used + '/' + u.limit + '회 사용';
   el.textContent = text;
@@ -752,7 +752,7 @@ textarea:focus { border-color:var(--gold); }
           <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원</span>
         </div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 횟수 무제한 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 매일 30회 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
         <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 이용권 구매</button>
       </div>
     </div>
@@ -1317,6 +1317,13 @@ function showLimitModal(tier, reason){
   }
   document.getElementById('limitModal').style.display='flex';
 }
+// 결제 권유 없이 안내만 보여주는 말풍선 (이미 이용권이 있는 회원용)
+function showNotice(html){
+  var ca=document.getElementById('chatArea');
+  var div=document.createElement('div'); div.className='msg msg-ai';
+  div.innerHTML='<div class="avatar">🕊️</div><div class="bubble">'+html+'</div>';
+  ca.appendChild(div); ca.scrollTop=ca.scrollHeight;
+}
 function closeLimitModal(){
   document.getElementById('limitModal').style.display='none';
 }
@@ -1510,6 +1517,7 @@ async function sendMsg(){
       if(data.usage) renderUsage(data.usage);
       if(data.code==='GUEST_LIMIT') document.getElementById('loginPromptModal').style.display='flex';
       else if(data.code==='DAILY_CAP') showLimitModal(data.usage && data.usage.tier, 'cap');
+      else if(data.code==='DAILY_LIMIT') showNotice('오늘 대화 '+(data.usage?data.usage.limit:30)+'회를 모두 사용하셨어요.<br>자정(한국시간) 이후 다시 이어서 대화하실 수 있어요 🙏');
       else showLimitModal(data.usage && data.usage.tier);
       return;
     }

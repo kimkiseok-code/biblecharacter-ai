@@ -5,7 +5,7 @@ import crypto from 'crypto';
 // ───────── 설정값 ─────────
 export const PLANS = {
   basic:   { amount: 2900, limit: 50,   name: 'BibleCharacter.AI 베이직 1개월 이용권' },
-  premium: { amount: 4900, limit: null, name: 'BibleCharacter.AI 프리미엄 1개월 이용권' }, // null = 무제한
+  premium: { amount: 4900, limit: null, daily: 30, name: 'BibleCharacter.AI 프리미엄 1개월 이용권' }, // 이용기간 중 하루 30회
 };
 export const FREE_MONTHLY_LIMIT = 3;   // 로그인 무료 회원: 매달 3회
 export const GUEST_MONTHLY_LIMIT = 3;  // 비로그인: IP당 매달 3회
@@ -14,7 +14,7 @@ export const FREE_DAILY_CAP = parseInt(process.env.FREE_DAILY_CAP || '50', 10);
 
 // 답변 모델: 무료는 저렴한 Haiku, 이용권 회원·관리자는 더 깊이 있는 Sonnet
 export const MODEL_FREE = process.env.MODEL_FREE || 'claude-haiku-4-5-20251001';
-export const MODEL_PAID = process.env.MODEL_PAID || 'claude-sonnet-4-6';
+export const MODEL_PAID = process.env.MODEL_PAID || 'claude-sonnet-5-5';
 const SESSION_DAYS = 30;               // 로그인 유지 기간
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'onsign@gmail.com')
@@ -124,13 +124,17 @@ export async function getQuota({ email, ip }) {
   if (email) {
     const ent = await getJSON(`plan:${email}`);
     if (ent && ent.expiresAt > Date.now() && PLANS[ent.plan]) {
-      return {
-        tier: ent.plan,
-        limit: PLANS[ent.plan].limit,
-        key: `usage:paid:${email}:${ent.orderId}`,
-        expiresAt: ent.expiresAt,
-        ttl: Math.ceil((ent.expiresAt - Date.now()) / 1000) + 86400,
-      };
+      const p = PLANS[ent.plan];
+      const totalKey = `usage:paid:${email}:${ent.orderId}`; // 이용권 전체 사용 횟수 (관리자·환불 판단용)
+      const ttl = Math.ceil((ent.expiresAt - Date.now()) / 1000) + 86400;
+      if (p.daily) {
+        return {
+          tier: ent.plan, limit: p.daily, period: 'day',
+          key: `${totalKey}:${kstDayKey()}`, ttl: 2 * 86400,
+          totalKey, totalTtl: ttl, expiresAt: ent.expiresAt,
+        };
+      }
+      return { tier: ent.plan, limit: p.limit, key: totalKey, ttl, expiresAt: ent.expiresAt };
     }
     return {
       tier: 'free',
@@ -166,12 +170,17 @@ export async function tryConsume(quota) {
     await redis('DECR', quota.key);
     return { ok: false, used: used - 1 };
   }
+  if (quota.totalKey) {
+    const t = await redis('INCR', quota.totalKey);
+    if (t === 1 && quota.totalTtl) await redis('EXPIRE', quota.totalKey, String(quota.totalTtl));
+  }
   return { ok: true, used };
 }
 
 // API 오류 등으로 대화가 실패하면 차감한 1회를 되돌림
 export async function refund(quota) {
   if (quota.key) await redis('DECR', quota.key);
+  if (quota.totalKey) await redis('DECR', quota.totalKey);
 }
 
 export function isFreeTier(quota) {

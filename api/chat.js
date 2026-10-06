@@ -52,8 +52,8 @@ export default async function handler(req, res) {
     if (!c.ok) {
       return res.status(402).json({
         error: '이용 가능한 횟수를 모두 사용했습니다',
-        code: quota.tier === 'guest' ? 'GUEST_LIMIT' : 'LIMIT',
-        usage: { tier: quota.tier, used: c.used, limit: quota.limit },
+        code: quota.tier === 'guest' ? 'GUEST_LIMIT' : (quota.period === 'day' ? 'DAILY_LIMIT' : 'LIMIT'),
+        usage: { tier: quota.tier, used: c.used, limit: quota.limit, period: quota.period || null },
       });
     }
     consumed = true;
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       content: data.content,
-      usage: { tier: quota.tier, used: c.used, limit: quota.limit },
+      usage: { tier: quota.tier, used: c.used, limit: quota.limit, period: quota.period || null },
     });
   } catch (error) {
     console.error('chat error:', error);

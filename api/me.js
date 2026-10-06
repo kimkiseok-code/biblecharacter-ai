@@ -13,7 +13,8 @@ export default async function handler(req, res) {
     res.status(200).json({
       tier: quota.tier,           // guest | free | basic | premium | admin
       used,
-      limit: quota.limit,         // null = 무제한
+      limit: quota.limit,         // null = 제한 없음 (관리자)
+      period: quota.period || null, // 'day' = 하루 기준 (프리미엄)
       expiresAt: quota.expiresAt || null,
     });
   } catch (e) {
