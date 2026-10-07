@@ -103,13 +103,13 @@ function renderUsage(u) {
   if(u.tier === 'guest') { el.style.display = 'none'; return; }
   var text;
   if(u.tier === 'admin') text = '👑 관리자 모드';
-  else if(u.tier === 'premium') text = '프리미엄 · 오늘 ' + u.used + '/' + u.limit + '회';
+  else if(u.tier === 'premium') text = '프리미엄 · 오늘 ' + u.used + '/' + u.limit + (u.totalLimit ? ' · 월 ' + (u.totalUsed||0) + '/' + u.totalLimit : '');
   else if(u.tier === 'basic') text = '베이직 ' + u.used + '/' + u.limit + '회';
   else text = '무료 ' + u.used + '/' + u.limit + '회 사용';
   el.textContent = text;
   el.style.display = 'inline';
-  el.style.color = (u.tier === 'admin') ? '#B8952A'
-    : (u.limit !== null && u.used >= u.limit) ? '#C07060' : '#4CAF50';
+  var full = (u.limit !== null && u.used >= u.limit) || (u.totalLimit && u.totalUsed >= u.totalLimit);
+  el.style.color = (u.tier === 'admin') ? '#B8952A' : full ? '#C07060' : '#4CAF50';
 }
 
 function refreshUsage() {
@@ -752,7 +752,7 @@ textarea:focus { border-color:var(--gold); }
           <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원</span>
         </div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 매일 30회 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 월 200회(매일 최대 30회) 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
         <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 이용권 구매</button>
       </div>
     </div>
@@ -1310,8 +1310,8 @@ function showLimitModal(tier, reason){
     t.textContent='오늘 준비된 무료 대화가 모두 소진됐어요';
     d.innerHTML='무료 대화는 매일 자정에 다시 열립니다.<br>지금 바로 이어가시려면 이용권을 선택해 주세요 🙏';
   } else {
-    t.textContent = tier==='basic'
-      ? '이용권의 대화 50회를 모두 사용하셨어요'
+    t.textContent = tier==='basic' ? '이용권의 대화 50회를 모두 사용하셨어요'
+      : tier==='premium' ? '이용권의 대화 200회를 모두 사용하셨어요'
       : '이번 달 무료 대화를 모두 사용하셨어요';
     d.innerHTML='말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏';
   }

@@ -4,6 +4,14 @@ import {
   isFreeTier, tryConsumeFreeCap, refundFreeCap, MODEL_FREE, MODEL_PAID,
 } from './_lib.js';
 
+// 화면에 보여줄 사용량 정보
+function usageOf(quota, c) {
+  return {
+    tier: quota.tier, used: c.used, limit: quota.limit, period: quota.period || null,
+    totalUsed: c.totalUsed ?? null, totalLimit: quota.totalLimit ?? null,
+  };
+}
+
 const MAX_MESSAGES = 20;        // 대화 맥락은 최근 20개까지만
 const MAX_MESSAGE_CHARS = 2000; // 한 메시지 최대 길이
 const MAX_SYSTEM_CHARS = 4000;
@@ -50,10 +58,13 @@ export default async function handler(req, res) {
     quota = await getQuota({ email: user && user.email, ip: clientIp(req) });
     const c = await tryConsume(quota);
     if (!c.ok) {
+      const code = quota.tier === 'guest' ? 'GUEST_LIMIT'
+        : c.reason === 'total' ? 'LIMIT'
+        : quota.period === 'day' ? 'DAILY_LIMIT' : 'LIMIT';
       return res.status(402).json({
         error: '이용 가능한 횟수를 모두 사용했습니다',
-        code: quota.tier === 'guest' ? 'GUEST_LIMIT' : (quota.period === 'day' ? 'DAILY_LIMIT' : 'LIMIT'),
-        usage: { tier: quota.tier, used: c.used, limit: quota.limit, period: quota.period || null },
+        code,
+        usage: usageOf(quota, c),
       });
     }
     consumed = true;
@@ -66,7 +77,7 @@ export default async function handler(req, res) {
         return res.status(402).json({
           error: '오늘 준비된 무료 대화가 모두 소진되었습니다',
           code: 'DAILY_CAP',
-          usage: { tier: quota.tier, used: c.used - 1, limit: quota.limit },
+          usage: usageOf(quota, { used: c.used - 1 }),
         });
       }
       capConsumed = true;
@@ -96,7 +107,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       content: data.content,
-      usage: { tier: quota.tier, used: c.used, limit: quota.limit, period: quota.period || null },
+      usage: usageOf(quota, c),
     });
   } catch (error) {
     console.error('chat error:', error);

@@ -1,5 +1,5 @@
 // api/me.js — 내 이용권과 남은 횟수 조회
-import { getUser, getQuota, getUsed, clientIp } from './_lib.js';
+import { getUser, getQuota, getUsed, getTotalUsed, clientIp } from './_lib.js';
 
 export default async function handler(req, res) {
   try {
@@ -15,6 +15,8 @@ export default async function handler(req, res) {
       used,
       limit: quota.limit,         // null = 제한 없음 (관리자)
       period: quota.period || null, // 'day' = 하루 기준 (프리미엄)
+      totalUsed: await getTotalUsed(quota), // 프리미엄: 이용권 전체 사용 횟수
+      totalLimit: quota.totalLimit ?? null, // 프리미엄: 200
       expiresAt: quota.expiresAt || null,
     });
   } catch (e) {

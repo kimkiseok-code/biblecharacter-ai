@@ -115,7 +115,7 @@ function render(list, freeToday, freeCap) {
     if (p.status === 'cancelled') badges.push('<span class="badge warn">환불됨 · ' + fmt(p.cancelledAt) + '</span>');
     else if (p.active) badges.push('<span class="badge ok">이용 중 · ' + new Date(p.expiresAt).toLocaleDateString('ko-KR') + '까지</span>');
     else badges.push('<span class="badge">이용기간 종료</span>');
-    badges.push('<span class="badge">사용 ' + p.used + (p.plan === 'basic' ? '/50' : '') + '회</span>');
+    badges.push('<span class="badge">사용 ' + p.used + (p.plan === 'basic' ? '/50' : '/200') + '회</span>');
     badges.push('<span class="badge">결제 ' + days + '일 경과</span>');
     if (refundable) badges.push('<span class="badge ok">환불 가능</span>');
 
