@@ -22,5 +22,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-renew",
+      "schedule": "0 0 * * *"
+    }
   ]
 }

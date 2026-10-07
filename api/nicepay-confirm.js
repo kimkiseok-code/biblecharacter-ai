@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       paidAt: now,
       expiresAt: addOneMonth(now),
     });
-    await setJSON(`order:${orderId}`, { ...order, status: 'paid', tid, paidAt: now });
+    await setJSON(`order:${orderId}`, { ...order, status: 'paid', tid, paidAt: now, kind: 'one-time' });
     // 결제 목록 (관리자 페이지·환불용). 주문 상세는 order:{orderId}에 있음
     await redis('LPUSH', 'payments:all', orderId);
     await redis('LPUSH', `payments:${order.email}`, orderId);

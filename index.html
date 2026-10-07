@@ -52,7 +52,10 @@
           var pendingPlan = localStorage.getItem('bca_pending_payment');
           if(pendingPlan) {
             localStorage.removeItem('bca_pending_payment');
-            setTimeout(function(){ window.startPayment(pendingPlan, true); }, 300);
+            setTimeout(function(){
+              if(pendingPlan.indexOf('sub:')===0) window.openSubscribe(pendingPlan.slice(4), true);
+              else window.startPayment(pendingPlan, true);
+            }, 300);
           }
         }
       }).catch(function(){});
@@ -100,11 +103,13 @@ function renderUsage(u) {
   var el = document.getElementById('usageCount');
   if(!el || !u) return;
   window._usage = u;
+  if(u.sub !== undefined) window._sub = u.sub;
+  var subTag = (window._sub && window._sub.status !== 'ended' && (u.tier==='basic'||u.tier==='premium')) ? ' 구독' : '';
   if(u.tier === 'guest') { el.style.display = 'none'; return; }
   var text;
   if(u.tier === 'admin') text = '👑 관리자 모드';
-  else if(u.tier === 'premium') text = '프리미엄 · 오늘 ' + u.used + '/' + u.limit + (u.totalLimit ? ' · 월 ' + (u.totalUsed||0) + '/' + u.totalLimit : '');
-  else if(u.tier === 'basic') text = '베이직 ' + u.used + '/' + u.limit + '회';
+  else if(u.tier === 'premium') text = '프리미엄' + subTag + ' · 오늘 ' + u.used + '/' + u.limit + (u.totalLimit ? ' · 월 ' + (u.totalUsed||0) + '/' + u.totalLimit : '');
+  else if(u.tier === 'basic') text = '베이직' + subTag + ' ' + u.used + '/' + u.limit + '회';
   else text = '무료 ' + u.used + '/' + u.limit + '회 사용';
   el.textContent = text;
   el.style.display = 'inline';
@@ -191,6 +196,156 @@ window.startPayment = function(plan, skipAgree) {
       });
     })
     .catch(function(){ alert('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); });
+};
+// ───────── 정기구독 ─────────
+var PLAN_INFO = {
+  basic:   { name:'베이직', amount:2900, desc:'매달 대화 50회' },
+  premium: { name:'프리미엄', amount:4900, desc:'매달 대화 200회 (하루 최대 30회)' }
+};
+var _subPlan = null;
+function fmtDate(ts){ return new Date(ts).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }); }
+function won(n){ return n.toLocaleString('ko-KR') + '원'; }
+
+window.openSubscribe = function(plan, skipAgree) {
+  if(!skipAgree) {
+    var agree = document.getElementById('refundAgree');
+    if(!agree || !agree.checked) {
+      alert('환불정책을 확인하고 동의란에 체크해 주세요.');
+      var box = document.getElementById('refundAgreeBox');
+      if(box) { box.style.borderColor = '#C07060'; box.scrollIntoView({behavior:'smooth', block:'center'}); }
+      return;
+    }
+  }
+  if(!window._currentUser) {
+    localStorage.setItem('bca_pending_payment', 'sub:' + plan);
+    document.getElementById('limitModal').style.display='none';
+    document.getElementById('loginPromptModal').style.display='flex';
+    return;
+  }
+  _subPlan = plan;
+  var p = PLAN_INFO[plan];
+  var first = Date.now();
+  var next = new Date(first); next.setMonth(next.getMonth()+1);
+  document.getElementById('subTitle').textContent = p.name + ' 정기구독 시작';
+  document.getElementById('subNotice').innerHTML =
+    '<b>' + p.name + ' · 월 ' + won(p.amount) + '</b> — ' + p.desc + '<br>' +
+    '· 오늘 첫 달 ' + won(p.amount) + '이 결제되고, <b>매월 ' + new Date(first).getDate() + '일경 같은 금액이 자동 결제</b>됩니다. (다음 결제 예정: ' + fmtDate(next) + ')<br>' +
+    '· 언제든 <b>구독 관리</b>에서 해지할 수 있고, 해지해도 결제한 기간이 끝날 때까지 이용할 수 있습니다.<br>' +
+    '· 결제 후 7일 이내, 대화를 이용하지 않았다면 전액 환불됩니다. <a href="/refund.html" target="_blank" style="color:var(--gold);">환불정책</a>';
+  document.getElementById('subAgreeText').innerHTML = '매월 <b>' + won(p.amount) + '</b>이 등록한 카드로 <b>자동 결제</b>되는 것에 동의합니다. (<a href="/terms.html" target="_blank" style="color:var(--gold);">이용약관</a>)';
+  document.getElementById('subSubmit').textContent = won(p.amount) + ' 결제하고 구독 시작';
+  ['subCardNo','subExp','subPw','subIdNo'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('subAgree').checked = false;
+  document.getElementById('subError').style.display = 'none';
+  document.getElementById('limitModal').style.display = 'none';
+  document.getElementById('subModal').style.display = 'flex';
+};
+
+window.closeSubscribe = function() {
+  ['subCardNo','subExp','subPw','subIdNo'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('subModal').style.display = 'none';
+};
+
+function subError(msg) {
+  var e = document.getElementById('subError');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+window.submitSubscribe = function() {
+  var cardNo = document.getElementById('subCardNo').value.replace(/\D/g,'');
+  var exp = document.getElementById('subExp').value.replace(/\D/g,'');
+  var pw = document.getElementById('subPw').value.replace(/\D/g,'');
+  var idNo = document.getElementById('subIdNo').value.replace(/\D/g,'');
+  if(cardNo.length < 14) return subError('카드번호를 확인해 주세요.');
+  if(exp.length !== 4) return subError('유효기간을 MM/YY 형식으로 입력해 주세요.');
+  if(pw.length !== 2) return subError('카드 비밀번호 앞 2자리를 입력해 주세요.');
+  if(idNo.length !== 6 && idNo.length !== 10) return subError('생년월일 6자리(법인카드는 사업자번호 10자리)를 입력해 주세요.');
+  if(!document.getElementById('subAgree').checked) return subError('자동결제 동의에 체크해 주세요.');
+  var btn = document.getElementById('subSubmit');
+  var label = btn.textContent;
+  btn.disabled = true; btn.textContent = '결제 진행 중… 창을 닫지 마세요';
+  document.getElementById('subError').style.display = 'none';
+  fetch('/api/subscribe', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ action:'start', plan:_subPlan, cardNo:cardNo, expMonth:exp.slice(0,2), expYear:exp.slice(2), cardPw:pw, idNo:idNo, agree:true })
+  }).then(function(r){ return r.json().then(function(d){ d._s = r.status; return d; }); })
+    .then(function(d){
+      btn.disabled = false; btn.textContent = label;
+      if(d._s === 401) { closeSubscribe(); handleSessionExpired(); return; }
+      if(!d.ok) { subError(d.error || '처리하지 못했습니다.'); return; }
+      closeSubscribe();
+      refreshUsage();
+      alert(PLAN_INFO[d.plan].name + ' 정기구독이 시작됐어요! 🙏\n다음 결제 예정일: ' + fmtDate(d.nextBillingAt) + '\n구독 관리는 오른쪽 위 이름 메뉴에서 할 수 있어요.');
+    })
+    .catch(function(){
+      btn.disabled = false; btn.textContent = label;
+      subError('네트워크 오류가 발생했습니다. 결제가 되었는지 구독 관리에서 확인한 뒤 다시 시도해 주세요.');
+    });
+};
+
+// 카드번호 4자리씩, 유효기간 MM/YY 자동 서식
+document.addEventListener('input', function(e){
+  if(e.target.id === 'subCardNo') {
+    var v = e.target.value.replace(/\D/g,'').slice(0,16);
+    e.target.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+  } else if(e.target.id === 'subExp') {
+    var x = e.target.value.replace(/\D/g,'').slice(0,4);
+    e.target.value = x.length > 2 ? x.slice(0,2) + '/' + x.slice(2) : x;
+  }
+});
+
+window.openManage = function() {
+  var menu = document.getElementById('userMenu'); if(menu) menu.style.display='none';
+  var body = document.getElementById('manageBody');
+  body.innerHTML = '불러오는 중…';
+  document.getElementById('manageModal').style.display = 'flex';
+  fetch('/api/me', { headers: authHeaders() }).then(function(r){
+    if(r.status === 401) { document.getElementById('manageModal').style.display='none'; handleSessionExpired(); return null; }
+    return r.json();
+  }).then(function(u){
+    if(!u) return;
+    renderUsage(u);
+    var s = u.sub;
+    if(!s) {
+      var pass = (u.tier === 'basic' || u.tier === 'premium') && u.expiresAt
+        ? '<div class="manage-row"><span>한 달 이용권</span><b>' + fmtDate(u.expiresAt) + '까지</b></div>' : '';
+      body.innerHTML = pass + '<div style="margin-top:10px;">이용 중인 정기구독이 없습니다.</div>' +
+        '<button class="manage-btn" style="background:var(--gold);border:none;color:var(--ink);" onclick="document.getElementById(\'manageModal\').style.display=\'none\';showLimitModal(\'free\')">이용권 / 구독 보기</button>';
+      return;
+    }
+    var p = PLAN_INFO[s.plan];
+    var rows =
+      '<div class="manage-row"><span>상품</span><b>' + p.name + ' 정기구독</b></div>' +
+      '<div class="manage-row"><span>금액</span><b>월 ' + won(s.amount) + '</b></div>' +
+      '<div class="manage-row"><span>결제 카드</span><b>' + (s.cardName || '카드') + ' ****' + (s.last4 || '') + '</b></div>';
+    if(s.status === 'active') {
+      rows += '<div class="manage-row"><span>다음 결제일</span><b>' + fmtDate(s.periodEnd) + '</b></div>';
+      if(s.failCount > 0) rows += '<div style="color:#B5533F;font-size:12px;margin-top:8px;">⚠️ 최근 자동 결제에 실패했어요. 카드 한도나 상태를 확인해 주세요. (3회 실패 시 구독이 종료됩니다)</div>';
+      rows += '<button class="manage-btn" style="background:white;border:1px solid #B5533F;color:#B5533F;" onclick="cancelSub()">구독 해지</button>';
+    } else {
+      rows += '<div class="manage-row"><span>상태</span><b style="color:#B5533F;">해지 예약됨</b></div>' +
+              '<div class="manage-row"><span>이용 가능</span><b>' + fmtDate(s.periodEnd) + '까지</b></div>' +
+              '<div style="font-size:12px;margin-top:8px;">이후에는 자동 결제되지 않습니다.</div>' +
+              '<button class="manage-btn" style="background:var(--gold);border:none;color:var(--ink);" onclick="resumeSub()">해지 취소하고 계속 구독</button>';
+    }
+    body.innerHTML = rows;
+  }).catch(function(){ body.innerHTML = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'; });
+};
+
+function subAction(action, confirmMsg, doneMsg) {
+  if(confirmMsg && !confirm(confirmMsg)) return;
+  fetch('/api/subscribe', { method:'POST', headers: authHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ action: action }) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(d.ok) { alert(doneMsg(d)); openManage(); } else alert(d.error || '처리하지 못했습니다.'); })
+    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
+}
+window.cancelSub = function() {
+  subAction('cancel', '정기구독을 해지할까요?\n이미 결제한 기간이 끝날 때까지는 계속 이용할 수 있습니다.',
+    function(d){ return '해지되었습니다. ' + fmtDate(d.usableUntil) + '까지 이용하실 수 있어요.'; });
+};
+window.resumeSub = function() {
+  subAction('resume', null, function(d){ return '구독을 계속합니다. 다음 결제일: ' + fmtDate(d.nextBillingAt); });
 };
   window.doLogout = function() {
   localStorage.removeItem('bca_user');
@@ -737,31 +892,79 @@ textarea:focus { border-color:var(--gold); }
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
       <div style="background:white;border:1.5px solid rgba(184,149,42,0.4);border-radius:14px;padding:14px 16px;text-align:left;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직 한 달 이용권</span>
-          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">2,900원</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">2,900원<small style="font-size:11px;font-weight:600;"> / 한 달</small></span>
         </div>
-<div style="display:inline-block;font-family:'Pretendard',sans-serif;font-size:11px;font-weight:600;color:var(--ink-mid);background:var(--gold-pale);border-radius:20px;padding:2px 9px;margin-bottom:6px;">자동결제 없음 · 한 달 뒤 자동 종료</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:#8A6A10;margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
+<div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:#8A6A10;margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">성경 인물 AI 대화 50회 · 대화(신앙 기록) 저장 및 열람</div>
-        <button onclick="startPayment('basic')" style="margin-top:10px;width:100%;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.4);border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:600;color:var(--ink-mid);cursor:pointer;">베이직 이용권 구매</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+          <div><button onclick="startPayment('basic')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:white;border:1px solid rgba(184,149,42,0.45);color:var(--ink-mid);font-weight:600;">한 달 이용권</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">자동결제 없음<br>한 달 뒤 자동 종료</div></div>
+          <div><button onclick="openSubscribe('basic')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.6);color:var(--ink);font-weight:700;">정기구독</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">매월 자동결제<br>언제든 해지</div></div>
+        </div>
       </div>
 
       <div style="background:var(--ink);border:1.5px solid var(--gold);border-radius:14px;padding:14px 16px;text-align:left;position:relative;">
         <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);font-family:'Pretendard',sans-serif;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">추천</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄 한 달 이용권</span>
-          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원<small style="font-size:11px;font-weight:600;"> / 한 달</small></span>
         </div>
-<div style="display:inline-block;font-family:'Pretendard',sans-serif;font-size:11px;font-weight:600;color:var(--gold-light);background:rgba(184,149,42,0.18);border-radius:20px;padding:2px 9px;margin-bottom:6px;">자동결제 없음 · 한 달 뒤 자동 종료</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
+<div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
         <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">성경 인물 AI 대화 200회(매일 최대 30회) · 대화(신앙 기록) 저장 및 열람</div>
-        <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 이용권 구매</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+          <div><button onclick="startPayment('premium')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:transparent;border:1px solid rgba(232,212,138,0.5);color:var(--gold-light);font-weight:600;">한 달 이용권</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">자동결제 없음<br>한 달 뒤 자동 종료</div></div>
+          <div><button onclick="openSubscribe('premium')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:var(--gold);border:none;color:var(--ink);font-weight:700;">정기구독</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">매월 자동결제<br>언제든 해지</div></div>
+        </div>
       </div>
     </div>
 
     <button onclick="closeLimitModal()" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">다음에 다시 이용하기</button>
   </div>
 </div>
+
+<!-- 정기구독: 카드 등록 -->
+<div id="subModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.9);align-items:center;justify-content:center;z-index:1001;padding:16px;overflow-y:auto;">
+  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:24px 20px;max-width:380px;width:100%;font-family:'Pretendard',sans-serif;margin:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:700;color:var(--ink);" id="subTitle">정기구독 시작</div>
+      <button onclick="closeSubscribe()" style="background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;">✕</button>
+    </div>
+    <div style="background:var(--gold-pale);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--ink-mid);line-height:1.75;margin-bottom:14px;" id="subNotice"></div>
+    <div class="sub-field"><label>카드번호</label><input id="subCardNo" inputmode="numeric" autocomplete="cc-number" maxlength="19" placeholder="0000 0000 0000 0000"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div class="sub-field"><label>유효기간 (월/년)</label><input id="subExp" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY"></div>
+      <div class="sub-field"><label>비밀번호 앞 2자리</label><input id="subPw" type="password" inputmode="numeric" maxlength="2" placeholder="••"></div>
+    </div>
+    <div class="sub-field"><label>생년월일 6자리 <span style="font-weight:400;color:var(--ink-soft);">(법인카드는 사업자번호 10자리)</span></label><input id="subIdNo" inputmode="numeric" maxlength="10" placeholder="YYMMDD"></div>
+    <div style="font-size:11px;color:var(--ink-soft);line-height:1.6;margin:2px 0 10px;">🔒 카드 정보는 저장하지 않고 암호화하여 결제대행사(나이스페이)에만 전달됩니다.</div>
+    <label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;color:var(--ink);line-height:1.6;cursor:pointer;margin-bottom:12px;">
+      <input type="checkbox" id="subAgree" style="width:16px;height:16px;margin-top:2px;accent-color:#B8952A;flex-shrink:0;">
+      <span id="subAgreeText"></span>
+    </label>
+    <div id="subError" style="display:none;font-size:12px;color:#B5533F;background:rgba(181,83,63,0.08);border-radius:8px;padding:8px 10px;margin-bottom:10px;"></div>
+    <button id="subSubmit" onclick="submitSubscribe()" style="width:100%;background:var(--gold);border:none;border-radius:10px;padding:12px;font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;"></button>
+  </div>
+</div>
+
+<!-- 정기구독: 구독 관리 -->
+<div id="manageModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.9);align-items:center;justify-content:center;z-index:1001;padding:16px;">
+  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:24px 20px;max-width:360px;width:100%;font-family:'Pretendard',sans-serif;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:700;color:var(--ink);">💳 구독 관리</div>
+      <button onclick="document.getElementById('manageModal').style.display='none'" style="background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;">✕</button>
+    </div>
+    <div id="manageBody" style="font-size:13px;color:var(--ink-mid);line-height:1.9;"></div>
+  </div>
+</div>
+<style>
+.sub-field { margin-bottom:10px; }
+.sub-field label { display:block; font-size:12px; font-weight:600; color:var(--ink-mid); margin-bottom:4px; }
+.sub-field input { width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 11px; font-family:'Pretendard',sans-serif; font-size:15px; background:white; color:var(--ink); outline:none; letter-spacing:0.03em; }
+.sub-field input:focus { border-color:var(--gold); }
+.manage-row { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); padding:6px 0; }
+.manage-row b { color:var(--ink); font-weight:600; }
+.manage-btn { width:100%; margin-top:14px; border-radius:10px; padding:11px; font-family:'Pretendard',sans-serif; font-size:13px; font-weight:600; cursor:pointer; }
+</style>
 
 <div id="loginPromptModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.88);align-items:center;justify-content:center;z-index:9999;padding:20px;">
   <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:36px 28px;max-width:360px;width:100%;text-align:center;">
@@ -874,6 +1077,7 @@ document.addEventListener('DOMContentLoaded', function(){
   <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
   <span style="font-size:10px;color:var(--ink-soft);">▾</span>
   <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
+    <button onclick="openManage()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">💳 구독 관리</button>
     <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
   </div>
 </div>

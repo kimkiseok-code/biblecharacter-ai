@@ -229,3 +229,49 @@ export function clientIp(req) {
   const xf = req.headers['x-forwarded-for'] || '';
   return (xf.split(',')[0] || req.headers['x-real-ip'] || '').trim();
 }
+
+// ───────── 나이스페이 공통 ─────────
+export async function nicepay(path, body) {
+  const basic = Buffer.from(`${process.env.NICEPAY_CLIENT_KEY}:${process.env.NICEPAY_SECRET_KEY}`).toString('base64');
+  const r = await fetch(`https://api.nicepay.co.kr${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Basic ${basic}` },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  // 응답 키가 대소문자 섞여 오는 경우 대비 (ResultCode / resultCode, BID / bid)
+  const pick = (a, b) => (d[a] !== undefined ? d[a] : d[b]);
+  return { ...d, resultCode: pick('resultCode', 'ResultCode'), resultMsg: pick('resultMsg', 'ResultMsg'), bid: pick('bid', 'BID'), tid: pick('tid', 'TID'), cardName: pick('cardName', 'CardName') };
+}
+
+// 카드정보 암호화 (나이스페이 규격: AES-128-ECB, 키 = SecretKey 앞 16자리, Hex)
+export function encryptCard({ cardNo, expYear, expMonth, idNo, cardPw }) {
+  const key = Buffer.from(String(process.env.NICEPAY_SECRET_KEY).slice(0, 16), 'utf8');
+  const plain = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+  const c = crypto.createCipheriv('aes-128-ecb', key, null);
+  return c.update(plain, 'utf8', 'hex') + c.final('hex');
+}
+
+export function newOrderId(prefix) {
+  return `${prefix}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+}
+
+// ───────── 정기구독 ─────────
+// sub:{email} = { plan, bid, cardName, last4, status: active|cancelled|ended, startedAt,
+//                 periodEnd, renewCount, failCount, lastError }
+// subs:index = 갱신 확인 대상 이메일 집합
+export async function getSub(email) { return getJSON(`sub:${email}`); }
+export async function saveSub(email, sub) {
+  await setJSON(`sub:${email}`, sub);
+  if (sub.status === 'active' || sub.status === 'cancelled') await redis('SADD', 'subs:index', email);
+  else await redis('SREM', 'subs:index', email);
+}
+
+// 결제 1건을 주문·결제목록·이용권에 기록 (단건/구독 공통)
+export async function grantPeriod({ email, plan, orderId, tid, amount, kind, periodStart, periodEnd }) {
+  const now = Date.now();
+  await setJSON(`plan:${email}`, { plan, orderId, tid, amount, paidAt: now, expiresAt: periodEnd, source: kind });
+  await setJSON(`order:${orderId}`, { email, plan, amount, status: 'paid', tid, paidAt: now, createdAt: now, kind, periodStart, periodEnd });
+  await redis('LPUSH', 'payments:all', orderId);
+  await redis('LPUSH', `payments:${email}`, orderId);
+}

@@ -1,5 +1,5 @@
 // api/me.js — 내 이용권과 남은 횟수 조회
-import { getUser, getQuota, getUsed, getTotalUsed, clientIp } from './_lib.js';
+import { getUser, getQuota, getUsed, getTotalUsed, clientIp, getSub, PLANS } from './_lib.js';
 
 export default async function handler(req, res) {
   try {
@@ -10,6 +10,17 @@ export default async function handler(req, res) {
     }
     const quota = await getQuota({ email: user && user.email, ip: clientIp(req) });
     const used = await getUsed(quota);
+    let sub = null;
+    if (user) {
+      const s = await getSub(user.email);
+      if (s && s.status !== 'ended') {
+        sub = {
+          plan: s.plan, status: s.status, amount: PLANS[s.plan].amount,
+          cardName: s.cardName, last4: s.last4, periodEnd: s.periodEnd,
+          failCount: s.failCount || 0,
+        };
+      }
+    }
     res.status(200).json({
       tier: quota.tier,           // guest | free | basic | premium | admin
       used,
@@ -18,6 +29,7 @@ export default async function handler(req, res) {
       totalUsed: await getTotalUsed(quota), // 프리미엄: 이용권 전체 사용 횟수
       totalLimit: quota.totalLimit ?? null, // 프리미엄: 200
       expiresAt: quota.expiresAt || null,
+      sub,                        // 정기구독 정보 (없으면 null)
     });
   } catch (e) {
     console.error('me error:', e);

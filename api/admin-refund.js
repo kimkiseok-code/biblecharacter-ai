@@ -1,7 +1,7 @@
 // api/admin-refund.js — (관리자 전용) 환불: 나이스페이 결제 취소 + 이용권 회수
 // body: { orderId, reason, revokeOnly }
 //   revokeOnly=true → 나이스페이 관리자 화면에서 이미 취소한 경우, 이용권만 회수
-import { getUser, isAdmin, redis, getJSON, setJSON } from './_lib.js';
+import { getUser, isAdmin, redis, getJSON, setJSON, getSub, saveSub, nicepay, newOrderId } from './_lib.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -11,7 +11,16 @@ export default async function handler(req, res) {
     if (!user) return res.status(401).json({ error: '로그인이 필요합니다', code: 'SESSION_EXPIRED' });
     if (!isAdmin(user.email)) return res.status(403).json({ error: '관리자만 사용할 수 있습니다' });
 
-    const { orderId, reason, revokeOnly } = req.body || {};
+    const { orderId, reason, revokeOnly, action, email: subEmail } = req.body || {};
+
+    // 구독만 즉시 종료 (환불 없음, 이미 결제한 기간은 그대로 이용)
+    if (action === 'endSub') {
+      const s = await getSub(subEmail);
+      if (!s || s.status === 'ended') return res.status(404).json({ error: '진행 중인 구독이 없습니다' });
+      await endSubscription(subEmail, s, 'admin');
+      return res.status(200).json({ ok: true });
+    }
+
     const order = await getJSON(`order:${orderId}`);
     if (!order) return res.status(404).json({ error: '주문을 찾을 수 없습니다' });
     if (order.status === 'cancelled') return res.status(409).json({ error: '이미 환불 처리된 주문입니다' });
@@ -53,9 +62,21 @@ export default async function handler(req, res) {
       cancelledVia: revokeOnly ? 'manual' : 'nicepay-api',
     });
 
-    res.status(200).json({ ok: true, revoked, cancelledAtNicepay: !revokeOnly });
+    // 4. 구독 결제를 환불하면 구독도 종료 (다음 달 자동 결제 중단)
+    let subEnded = false;
+    if (String(order.kind || '').startsWith('sub')) {
+      const s = await getSub(order.email);
+      if (s && s.status !== 'ended') { await endSubscription(order.email, s, 'refund'); subEnded = true; }
+    }
+
+    res.status(200).json({ ok: true, revoked, subEnded, cancelledAtNicepay: !revokeOnly });
   } catch (e) {
     console.error('admin-refund error:', e);
     res.status(500).json({ error: '서버 오류가 발생했습니다' });
   }
+}
+
+async function endSubscription(email, s, reason) {
+  try { await nicepay(`/v1/subscribe/${encodeURIComponent(s.bid)}/expire`, { orderId: newOrderId('BCAX') }); } catch (e) {}
+  await saveSub(email, { ...s, status: 'ended', endedAt: Date.now(), endReason: reason });
 }
