@@ -4,8 +4,8 @@ import crypto from 'crypto';
 
 // ───────── 설정값 ─────────
 export const PLANS = {
-  basic:   { amount: 2900, limit: 50,   name: 'BibleCharacter.AI 베이직 1개월 이용권' },
-  premium: { amount: 4900, limit: 200, daily: 30, name: 'BibleCharacter.AI 프리미엄 1개월 이용권' }, // 이용기간 총 200회, 하루 최대 30회
+  basic:   { amount: 2900, limit: 50,   name: 'BibleCharacter.AI 베이직 한 달 이용권' },
+  premium: { amount: 4900, limit: 200, daily: 30, name: 'BibleCharacter.AI 프리미엄 한 달 이용권' }, // 이용기간 총 200회, 하루 최대 30회
 };
 export const FREE_MONTHLY_LIMIT = 3;   // 로그인 무료 회원: 매달 3회
 export const GUEST_MONTHLY_LIMIT = 3;  // 비로그인: IP당 매달 3회

@@ -55,13 +55,13 @@ body { background: #1A1610; display: flex; align-items: center; justify-content:
   } catch (e) {}
 
   const until = expiresAt
-    ? '<br><span style="font-size:12px;color:#8A7A60;">이용기간: ' + new Date(expiresAt).toLocaleDateString('ko-KR') + '까지</span>'
+    ? '<br><span style="font-size:12px;color:#8A7A60;">이용기간: ' + new Date(expiresAt).toLocaleDateString('ko-KR') + '까지 · 자동결제 없이 자동 종료</span>'
     : '';
 
   if (tier === 'premium') {
-    done('프리미엄 이용권이 활성화됐어요!<br>이용기간 동안 월 200회(매일 최대 30회) 말씀을 나눌 수 있습니다. 🙏' + until);
+    done('프리미엄 한 달 이용권이 활성화됐어요!<br>이용기간 동안 월 200회(매일 최대 30회) 말씀을 나눌 수 있습니다. 🙏' + until);
   } else if (tier === 'basic') {
-    done('베이직 이용권이 활성화됐어요!<br>이용기간 동안 50회 대화를 이용하실 수 있습니다. 🙏' + until);
+    done('베이직 한 달 이용권이 활성화됐어요!<br>이용기간 동안 50회 대화를 이용하실 수 있습니다. 🙏' + until);
   } else {
     done('결제는 완료됐지만 이용권 확인이 늦어지고 있어요.<br>잠시 후 홈에서 다시 확인해 주시고, 계속 안 되면 010-5469-0568로 문의해 주세요.');
   }
