@@ -406,10 +406,7 @@ body { background:#1A1610; min-height:100vh; font-family:'Pretendard',sans-serif
 .logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; transition:all .3s ease; }
 .logo-mini { display:none; font-size:11px; color:var(--ink-soft); font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.04em; }
 .chat-screen .header { padding:7px 22px 7px; }
-.chat-screen .logo span { display:none; }
-.logo .logo-sub, .chat-screen .logo .logo-sub { display:inline-block; margin-left:8px; padding-left:8px; border-left:1px solid rgba(184,149,42,.4); font-size:11px; line-height:1.2; vertical-align:1px; color:var(--ink-soft); font-weight:400; }
-@media (max-width:560px) { .logo .logo-sub, .chat-screen .logo .logo-sub { display:none; } }
-.chat-screen .logo-mini { display:inline; }
+.chat-screen .logo span { display:none; }.chat-screen .logo-mini { display:inline; }
 .header-right { display:flex; align-items:center; gap:10px; }
 .api-status { font-size:10px; color:#4CAF50; display:flex; align-items:center; gap:5px; }
 .status-dot { width:6px; height:6px; background:#4CAF50; border-radius:50%; }
@@ -1072,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="mainApp" style="display:block;">
 <div class="app">
   <div class="header">
-    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ BibleCharacter.AI<span class="logo-sub">성경 인물 AI 멘토</span><span class="logo-mini" id="logoMini"> · </span></div>
+    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ 성경 인물 AI 멘토<span class="logo-mini" id="logoMini"> · </span></div>
     <div class="header-right">
       <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
   <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
