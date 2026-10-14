@@ -1,5 +1,5 @@
 // api/callback.js — 구글 로그인 후 콜백 처리
-import { signSession } from './_lib.js';
+import { signSession, googleRedirectUri } from './_lib.js';
 
 export default async function handler(req, res) {
   const { code, error } = req.query;
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://biblecharacter-ai.vercel.app/api/callback';
+  const redirectUri = googleRedirectUri(req);
 
   try {
     // 1. code → access_token 교환

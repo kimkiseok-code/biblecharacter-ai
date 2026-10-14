@@ -1,7 +1,9 @@
 // api/google.js — 구글 로그인 시작 (OAuth 리다이렉트)
+import { googleRedirectUri } from './_lib.js';
+
 export default function handler(req, res) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://biblecharacter-ai.vercel.app/api/callback';
+  const redirectUri = googleRedirectUri(req);
 
   const params = new URLSearchParams({
     client_id: clientId,

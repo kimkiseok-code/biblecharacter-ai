@@ -275,3 +275,12 @@ export async function grantPeriod({ email, plan, orderId, tid, amount, kind, per
   await redis('LPUSH', 'payments:all', orderId);
   await redis('LPUSH', `payments:${email}`, orderId);
 }
+
+// ───────── 구글 로그인: 접속한 주소에 맞춰 돌아올 주소 결정 ─────────
+// 허용된 주소에서만 그 주소로 돌려보냄 (Google Cloud Console에 모두 등록되어 있어야 함)
+const OAUTH_HOSTS = ['bible.cheonha.app', 'biblecharacter-ai.vercel.app'];
+export function googleRedirectUri(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  if (OAUTH_HOSTS.includes(host)) return `https://${host}/api/callback`;
+  return process.env.GOOGLE_REDIRECT_URI || 'https://bible.cheonha.app/api/callback';
+}
