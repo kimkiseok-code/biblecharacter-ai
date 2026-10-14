@@ -1,5 +1,5 @@
 // api/nicepay-confirm.js — 나이스페이 결제 승인 + 이용권 부여
-import { redis, getJSON, setJSON, addOneMonth } from './_lib.js';
+import { redis, getJSON, setJSON, addOneMonth, notePayment } from './_lib.js';
 
 function fail(res, msg) {
   return res.redirect(303, `/payment-fail.html?msg=${encodeURIComponent(msg || '결제에 실패했습니다')}`);
@@ -51,6 +51,7 @@ export default async function handler(req, res) {
     // 결제 목록 (관리자 페이지·환불용). 주문 상세는 order:{orderId}에 있음
     await redis('LPUSH', 'payments:all', orderId);
     await redis('LPUSH', `payments:${order.email}`, orderId);
+    try { await notePayment(order.email, order.amount); } catch (e) { console.error('notePayment error:', e); }
 
     return res.redirect(303, `/payment-success.html?plan=${order.plan}`);
   } catch (err) {

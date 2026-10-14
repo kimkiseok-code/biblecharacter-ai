@@ -23,6 +23,34 @@
 </script>
 
 <script>
+// 유입 출처 기록 (?from=yt 등). 처음 들어온 출처를 기억해 가입·결제와 연결
+(function(){
+  try {
+    var params = new URLSearchParams(location.search);
+    var raw = params.get('from');
+    var src = raw ? raw.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,20) : '';
+    var first = null;
+    try { first = localStorage.getItem('bca_from'); } catch(e) {}
+    if (src && !first) { try { localStorage.setItem('bca_from', src); } catch(e) {} first = src; }
+    // 구글 로그인에서 돌아올 때 서버가 읽을 수 있게 쿠키로도 둠 (90일)
+    if (first) document.cookie = 'bca_from=' + first + '; Max-Age=7776000; Path=/; SameSite=Lax; Secure';
+    // 주소창에서 꼬리표는 지움 (다른 값은 그대로)
+    if (raw !== null) {
+      params.delete('from');
+      var q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+    }
+    // 방문은 창 하나당 한 번만 기록
+    var seen = null;
+    try { seen = sessionStorage.getItem('bca_visit'); sessionStorage.setItem('bca_visit', '1'); } catch(e) { seen = '1'; }
+    if (!seen && !params.get('bca_token')) {
+      fetch('/api/track', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ from: src || 'direct' }), keepalive:true }).catch(function(){});
+    }
+  } catch(e) {}
+})();
+</script>
+
+<script>
 // 로그인 상태 확인 (서명된 세션 사용) + 사용량은 서버에서 조회
 (function() {
   var saved = localStorage.getItem('bca_user');

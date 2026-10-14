@@ -87,6 +87,22 @@ export async function redis(...command) {
   return data.result;
 }
 
+// 여러 명령을 한 번에 보냄 (Upstash pipeline). 결과는 명령 순서대로
+export async function redisPipeline(commands) {
+  const { url, token } = redisConfig();
+  const r = await fetch(url + '/pipeline', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(commands),
+  });
+  const data = await r.json();
+  if (!Array.isArray(data)) throw new Error('Redis 오류: ' + (data && data.error));
+  return data.map(x => {
+    if (x && x.error) throw new Error('Redis 오류: ' + x.error);
+    return x ? x.result : null;
+  });
+}
+
 export async function getJSON(key) {
   const v = await redis('GET', key);
   return v ? JSON.parse(v) : null;
@@ -200,7 +216,7 @@ export function isFreeTier(quota) {
 }
 
 // ───────── 사이트 전체 무료 대화 하루 상한 ─────────
-function kstDayKey(ts = Date.now()) {
+export function kstDayKey(ts = Date.now()) {
   const d = new Date(ts + 9 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
 }
@@ -275,6 +291,79 @@ export async function grantPeriod({ email, plan, orderId, tid, amount, kind, per
   await redis('LPUSH', 'payments:all', orderId);
   await redis('LPUSH', `payments:${email}`, orderId);
 }
+
+// ───────── 유입 출처 통계 (?from= 꼬리표) ─────────
+// stats:{YYYY-MM-DD} (한국 날짜) / stats:all 해시에 "출처:항목" 필드로 누적
+//   항목: visit(방문) · signup(첫 로그인) · pay(결제 건수) · amount(결제 금액)
+// src:{email} = 그 회원이 처음 들어온 출처 ('existing' = 이 기능 이전부터 쓰던 회원)
+const SPECIAL_SOURCES = ['direct', 'existing', 'other'];
+const MAX_SOURCES = 30; // 이상한 꼬리표가 끝없이 쌓이지 않도록 출처 종류 상한
+
+export function normSrc(s) {
+  const v = String(s || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20);
+  return v || 'direct';
+}
+
+export function readCookie(req, name) {
+  const m = String(req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+  if (!m) return '';
+  try { return decodeURIComponent(m[1]); } catch (e) { return ''; }
+}
+
+async function allowSrc(src) {
+  src = normSrc(src);
+  if (SPECIAL_SOURCES.includes(src)) return src;
+  if (await redis('SISMEMBER', 'stats:sources', src)) return src;
+  if ((await redis('SCARD', 'stats:sources')) >= MAX_SOURCES) return 'other';
+  await redis('SADD', 'stats:sources', src);
+  return src;
+}
+
+// fields 예: { visit: 1 } / { pay: 1, amount: 2900 }
+export async function bumpStats(src, fields) {
+  src = await allowSrc(src);
+  const day = `stats:${kstDayKey()}`;
+  const cmds = [];
+  for (const [f, n] of Object.entries(fields)) {
+    cmds.push(['HINCRBY', day, `${src}:${f}`, String(n)]);
+    cmds.push(['HINCRBY', 'stats:all', `${src}:${f}`, String(n)]);
+  }
+  cmds.push(['EXPIRE', day, String(400 * 86400)]);
+  await redisPipeline(cmds);
+  return src;
+}
+
+// 구글 로그인 직후 호출: 처음 로그인한 회원이면 '가입'으로 세고 출처를 기억
+export async function noteLogin(email, from) {
+  email = String(email).toLowerCase();
+  if (isAdmin(email)) return;
+  const isNew = await redis('SET', `seen:${email}`, '1', 'NX');
+  if (!isNew) return;
+  // 이 기능을 넣기 전부터 쓰던 회원(이용 흔적 있음)은 가입으로 세지 않음
+  const prevMonth = kstMonthKey(Date.now() - 32 * 86400000);
+  const old = await redisPipeline([
+    ['EXISTS', `plan:${email}`],
+    ['EXISTS', `sub:${email}`],
+    ['LLEN', `payments:${email}`],
+    ['EXISTS', `usage:free:${email}:${kstMonthKey()}`],
+    ['EXISTS', `usage:free:${email}:${prevMonth}`],
+  ]);
+  if (old.some(v => Number(v) > 0)) {
+    await redis('SET', `src:${email}`, 'existing');
+    return;
+  }
+  const src = await bumpStats(from, { signup: 1 });
+  await redis('SET', `src:${email}`, src);
+}
+
+// 결제 성공 시 호출 (이용권 결제, 구독 첫 결제. 자동 갱신은 세지 않음)
+export async function notePayment(email, amount) {
+  const src = (await redis('GET', `src:${String(email).toLowerCase()}`)) || 'existing';
+  await bumpStats(src, { pay: 1, amount: Number(amount) || 0 });
+}
+
+// 방문 기록 남용 방지용: IP를 되돌릴 수 없는 값으로 바꾼 키
+export function ipTag(ip) { return hashIp(ip); }
 
 // ───────── 구글 로그인: 접속한 주소에 맞춰 돌아올 주소 결정 ─────────
 // 허용된 주소에서만 그 주소로 돌려보냄 (Google Cloud Console에 모두 등록되어 있어야 함)

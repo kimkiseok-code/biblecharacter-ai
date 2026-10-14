@@ -1,5 +1,5 @@
 // api/callback.js — 구글 로그인 후 콜백 처리
-import { signSession, googleRedirectUri } from './_lib.js';
+import { signSession, googleRedirectUri, noteLogin, readCookie } from './_lib.js';
 
 export default async function handler(req, res) {
   const { code, error } = req.query;
@@ -40,6 +40,9 @@ export default async function handler(req, res) {
     if (!user.email) {
       return res.redirect('/?login_error=no_email');
     }
+
+    // 처음 로그인이면 '가입'으로 기록 (출처는 첫 방문 때 남긴 쿠키). 실패해도 로그인은 계속
+    try { await noteLogin(user.email, readCookie(req, 'bca_from')); } catch (e) { console.error('noteLogin error:', e); }
 
     // 3. 유저 정보를 서명된 세션 토큰으로 만들어 프론트로 전달 (위조 불가)
     const token = signSession({

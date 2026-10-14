@@ -4,7 +4,7 @@
 // ⚠️ 카드 정보는 저장·로그하지 않음. 암호화해서 나이스페이로만 전송
 import {
   getUser, redis, getJSON, PLANS, addOneMonth, clientIp,
-  nicepay, encryptCard, newOrderId, getSub, saveSub, grantPeriod,
+  nicepay, encryptCard, newOrderId, getSub, saveSub, grantPeriod, notePayment,
 } from './_lib.js';
 
 const MAX_TRIES_PER_DAY = 5; // 도난 카드 시험(카드 테스팅) 방지
@@ -91,6 +91,7 @@ async function start(req, res, email, body) {
   const now = Date.now();
   const periodEnd = addOneMonth(now);
   await grantPeriod({ email, plan: body.plan, orderId, tid: pay.tid, amount: p.amount, kind: 'sub-first', periodStart: now, periodEnd });
+  try { await notePayment(email, p.amount); } catch (e) { console.error('notePayment error:', e); }
   await saveSub(email, {
     plan: body.plan, bid, cardName: reg.cardName || (pay.card && pay.card.cardName) || '', last4,
     status: 'active', startedAt: now, periodEnd, renewCount: 1, failCount: 0, lastError: '',

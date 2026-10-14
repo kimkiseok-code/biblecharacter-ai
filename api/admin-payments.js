@@ -1,5 +1,21 @@
 // api/admin-payments.js — (관리자 전용) 최근 결제 목록 + 각 결제의 사용 횟수
-import { getUser, isAdmin, redis, getJSON, getFreeToday, FREE_DAILY_CAP, getSub, PLANS } from './_lib.js';
+import { getUser, isAdmin, redis, redisPipeline, getJSON, getFreeToday, FREE_DAILY_CAP, getSub, PLANS, kstDayKey } from './_lib.js';
+
+// Upstash HGETALL 결과 [필드, 값, 필드, 값…] → { 필드: 숫자 }
+function toObj(flat) {
+  const o = {};
+  if (Array.isArray(flat)) for (let i = 0; i + 1 < flat.length; i += 2) o[flat[i]] = Number(flat[i + 1]) || 0;
+  else if (flat && typeof flat === 'object') for (const k in flat) o[k] = Number(flat[k]) || 0;
+  return o;
+}
+
+// 출처별 통계: 최근 30일(하루 단위) + 전체 누적
+async function loadStats() {
+  const days = [];
+  for (let i = 0; i < 30; i++) days.push(kstDayKey(Date.now() - i * 86400000));
+  const rows = await redisPipeline([...days.map(d => ['HGETALL', `stats:${d}`]), ['HGETALL', 'stats:all']]);
+  return { days: days.map((d, i) => ({ day: d, data: toObj(rows[i]) })), all: toObj(rows[days.length]) };
+}
 
 export default async function handler(req, res) {
   try {
@@ -44,7 +60,10 @@ export default async function handler(req, res) {
     subs.sort((a, b) => a.periodEnd - b.periodEnd);
     const lastRun = await getJSON('cron:lastRun');
 
-    res.status(200).json({ payments: list, subs, lastRun, freeToday: await getFreeToday(), freeCap: FREE_DAILY_CAP });
+    let stats = null;
+    try { stats = await loadStats(); } catch (e) { console.error('stats error:', e); }
+
+    res.status(200).json({ payments: list, subs, lastRun, freeToday: await getFreeToday(), freeCap: FREE_DAILY_CAP, stats });
   } catch (e) {
     console.error('admin-payments error:', e);
     res.status(500).json({ error: '서버 오류가 발생했습니다' });

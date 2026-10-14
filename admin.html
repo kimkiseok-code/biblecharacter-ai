@@ -43,6 +43,18 @@ h1 span { display: block; color: var(--ink-soft); font-size: 12px; font-weight: 
 .msg a { color: var(--gold); }
 .sec { color: #E8D48A; font-size: 14px; font-weight: 700; margin: 18px 0 8px; }
 .sec small { color: var(--ink-soft); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
+.periods { display: flex; gap: 6px; margin-bottom: 8px; }
+.periods button { border: 1px solid rgba(184,149,42,.4); background: transparent; color: #E8D48A; border-radius: 20px; padding: 5px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.periods button.on { background: var(--gold); border-color: var(--gold); color: var(--ink); font-weight: 700; }
+.tbl-wrap { background: var(--parchment); border-radius: 14px; overflow-x: auto; margin-bottom: 6px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th, .tbl td { padding: 10px 12px; text-align: right; white-space: nowrap; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl th { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; border-bottom: 1px solid var(--border); }
+.tbl td { border-bottom: 1px solid rgba(184,149,42,.12); }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr.total td { font-weight: 700; background: rgba(184,149,42,.08); }
+.tbl small { color: var(--ink-soft); font-size: 11px; }
 .help { color: var(--ink-soft); font-size: 12px; line-height: 1.7; margin-top: 18px; }
 </style>
 </head>
@@ -53,11 +65,19 @@ h1 span { display: block; color: var(--ink-soft); font-size: 12px; font-weight: 
     <button class="btn ghost" onclick="load()">새로고침</button>
   </header>
   <div id="summary" class="summary" style="display:none"></div>
+  <h2 class="sec" id="srcHead" style="display:none">유입 출처</h2>
+  <div id="srcBox" style="display:none">
+    <div class="periods" id="periods">
+      <button data-p="1">오늘</button><button data-p="7" class="on">7일</button><button data-p="30">30일</button><button data-p="all">전체</button>
+    </div>
+    <div class="tbl-wrap"><table class="tbl" id="srcTbl"></table></div>
+  </div>
   <h2 class="sec" id="subsHead" style="display:none">정기구독자</h2>
   <div id="subs"></div>
   <h2 class="sec" id="payHead" style="display:none">결제 내역</h2>
   <div id="list"></div>
   <p class="help">
+    · <b>유입 출처</b>: 링크 꼬리표(?from=yt 등)별로 셉니다. 방문은 창 하나당 1번, 가입은 처음 구글 로그인한 회원(처음 들어온 출처 기준), 결제는 이용권 결제와 구독 첫 결제입니다(매달 자동 갱신과 환불은 반영하지 않음). '기존 회원'은 이 기능을 넣기 전부터 쓰던 회원의 결제입니다. 날짜는 한국시간 기준입니다.<br>
     · <b>환불 가능 표시</b>: 환불정책 기준(결제 후 7일 이내, 대화 0회 사용)에 맞는 결제입니다. 판단은 직접 하시면 됩니다.<br>
     · <b>환불</b>: 나이스페이 결제를 전액 취소하고 앱 이용권도 회수합니다.<br>
     · <b>오늘 무료 대화</b>: 비로그인·무료 회원 대화를 합친 사이트 전체 하루 횟수입니다. 상한에 닿으면 무료 대화만 멈추고, 이용권 회원은 그대로 이용합니다. 상한은 Vercel 환경변수 FREE_DAILY_CAP으로 바꿀 수 있습니다.<br>
@@ -86,7 +106,7 @@ function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ 
 
 function showMsg(html) {
   document.getElementById('summary').style.display = 'none';
-  ['subsHead','payHead'].forEach(function (id) { document.getElementById(id).style.display = 'none'; });
+  ['subsHead','payHead','srcHead','srcBox'].forEach(function (id) { document.getElementById(id).style.display = 'none'; });
   document.getElementById('subs').innerHTML = '';
   document.getElementById('list').innerHTML = '<div class="msg">' + html + '</div>';
 }
@@ -99,8 +119,47 @@ function load() {
     if (d._status === 403) { showMsg('관리자 계정이 아닙니다.'); return; }
     if (!d.payments) { showMsg(esc(d.error || '불러오지 못했습니다')); return; }
     render(d.payments, d.freeToday, d.freeCap);
+    statsData = d.stats; renderStats();
     renderSubs(d.subs || [], d.lastRun);
   }).catch(function () { showMsg('네트워크 오류가 발생했습니다.'); });
+}
+
+// ── 유입 출처 표 ──
+var statsData = null, statsPeriod = '7';
+var SRC_NAMES = { yt: '유튜브', blog: '블로그', church: '교회 나눔지', kakao: '카톡', share: '카드 공유', direct: '직접 방문', existing: '기존 회원', other: '기타' };
+document.getElementById('periods').addEventListener('click', function (e) {
+  var p = e.target.getAttribute('data-p'); if (!p) return;
+  statsPeriod = p;
+  document.querySelectorAll('#periods button').forEach(function (b) { b.classList.toggle('on', b === e.target); });
+  renderStats();
+});
+function renderStats() {
+  var head = document.getElementById('srcHead'), box = document.getElementById('srcBox');
+  if (!statsData) { head.style.display = 'none'; box.style.display = 'none'; return; }
+  head.style.display = 'block'; box.style.display = 'block';
+  var sum = {};
+  function add(obj) { for (var k in obj) sum[k] = (sum[k] || 0) + obj[k]; }
+  if (statsPeriod === 'all') add(statsData.all || {});
+  else (statsData.days || []).slice(0, +statsPeriod).forEach(function (d) { add(d.data || {}); });
+  var rows = {};
+  for (var k in sum) {
+    var i = k.lastIndexOf(':'); var src = k.slice(0, i), f = k.slice(i + 1);
+    rows[src] = rows[src] || { visit: 0, signup: 0, pay: 0, amount: 0 };
+    rows[src][f] = sum[k];
+  }
+  var list = Object.keys(rows).map(function (s) { rows[s].src = s; return rows[s]; });
+  list.sort(function (a, b) { return (b.amount - a.amount) || (b.visit - a.visit) || (b.signup - a.signup); });
+  var t = { visit: 0, signup: 0, pay: 0, amount: 0 };
+  list.forEach(function (r) { t.visit += r.visit; t.signup += r.signup; t.pay += r.pay; t.amount += r.amount; });
+  function rate(a, b) { return b ? ' <small>' + Math.round(a / b * 100) + '%</small>' : ''; }
+  var html = '<tr><th>출처</th><th>방문</th><th>가입</th><th>결제</th><th>결제 금액</th></tr>';
+  if (!list.length) html += '<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:20px">아직 기록이 없습니다.</td></tr>';
+  list.forEach(function (r) {
+    var name = SRC_NAMES[r.src] ? SRC_NAMES[r.src] + ' <small>' + esc(r.src) + '</small>' : esc(r.src);
+    html += '<tr><td>' + name + '</td><td>' + r.visit + '</td><td>' + r.signup + rate(r.signup, r.visit) + '</td><td>' + r.pay + '</td><td>' + won(r.amount) + '</td></tr>';
+  });
+  if (list.length > 1) html += '<tr class="total"><td>합계</td><td>' + t.visit + '</td><td>' + t.signup + '</td><td>' + t.pay + '</td><td>' + won(t.amount) + '</td></tr>';
+  document.getElementById('srcTbl').innerHTML = html;
 }
 
 function render(list, freeToday, freeCap) {
