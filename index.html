@@ -734,6 +734,17 @@ textarea:focus { border-color:var(--gold); }
 }
 .btn-save2:hover { background:#9A7A1E; }
 
+/* 말씀 카드 공유 */
+.share-modal { display:none; position:fixed; inset:0; background:rgba(20,16,10,.82); z-index:3000; align-items:center; justify-content:center; padding:16px; }
+.share-box { background:#FAF6EC; border-radius:16px; padding:16px; width:100%; max-width:400px; max-height:100%; display:flex; flex-direction:column; gap:12px; }
+.share-box img { width:100%; max-height:62vh; object-fit:contain; border-radius:10px; background:#2A2318; }
+.share-note { font-size:12px; color:#8A7A60; text-align:center; line-height:1.5; }
+.share-btns { display:flex; gap:8px; }
+.share-btns button { flex:1; border-radius:12px; padding:12px; font-family:'Pretendard',sans-serif; font-size:14px; font-weight:600; cursor:pointer; border:none; }
+.share-btns .sb-main { background:var(--gold); color:var(--ink); }
+.share-btns .sb-sub { background:var(--gold-pale); border:1px solid rgba(184,149,42,.4); color:var(--ink-mid); }
+.share-close { background:none; border:none; color:#8A7A60; font-size:13px; cursor:pointer; padding:4px; font-family:'Pretendard',sans-serif; }
+
 /* 예시 보기 토글 */
 .quick-toggle {
   padding:6px 16px 0;
@@ -1111,9 +1122,21 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="answer-actions" id="answerActions">
     <div class="btn-row">
       <button class="btn-again" onclick="askAgain()">🔄 다시 묻기</button>
+      <button class="btn-again" onclick="openShareCard()">📤 카드 공유</button>
       <button class="btn-save2" onclick="saveRecord()">💾 저장하기</button>
     </div>
     <button class="btn-home" onclick="goHome()">🏠 처음으로</button>
+  </div>
+  <div class="share-modal" id="shareModal" onclick="if(event.target===this)closeShareCard()">
+    <div class="share-box">
+      <img id="shareImg" alt="말씀 카드 미리보기">
+      <div class="share-note">대화 중 남기신 고민은 카드에 들어가지 않습니다.</div>
+      <div class="share-btns">
+        <button class="sb-main" id="shareSendBtn" onclick="sendShareCard()">카톡 등으로 공유하기</button>
+        <button class="sb-sub" onclick="downloadShareCard()">이미지 저장</button>
+      </div>
+      <button class="share-close" onclick="closeShareCard()">닫기</button>
+    </div>
   </div>
   <div class="input-area">
     <textarea id="msgInput" placeholder="오늘 마음의 짐을 나눠보세요..." onkeydown="handleKey(event)"></textarea>
@@ -1570,6 +1593,151 @@ function saveRecord(){
   saveRecords(arr);
   hideSaveBar();
   showToast('💾 신앙 기록이 저장되었습니다 🙏');
+}
+
+// ── 말씀 카드 공유 ──────────────────────────
+// 마지막 답변에서 성경 구절 1개 + 마지막 격려 문단만 뽑아 이미지로 만듦 (사용자 고민 글은 넣지 않음)
+var shareBlob=null;
+var SHARE_URL='https://bible.cheonha.app/?from=share';
+
+function cleanReplyText(t){
+  return String(t||'').replace(/^#{1,6}\s+/gm,'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/^>\s?/gm,'');
+}
+function pickCardContent(reply){
+  var main=cleanReplyText(reply).split('---')[0].trim();
+  var verse=null;
+  // 답변은 공감 → 격려 순서라 뒤쪽 구절이 더 희망적임 → 마지막 인용 구절을 고름
+  var re=/["“]([^"”]{6,140})["”]\s*\(([가-힣]{1,8}\s?\d+:\d+(?:\s?[-~,]\s?\d+)*)\)/g, m;
+  while((m=re.exec(main))) verse={text:m[1].trim(), ref:m[2].trim()};
+  var paras=main.split(/\n\s*\n/).map(function(p){return p.replace(/\s*\n\s*/g,' ').trim();}).filter(Boolean);
+  var msg=paras.length?paras[paras.length-1]:'';
+  if(msg.length<40 && paras.length>1) msg=paras[paras.length-2]+' '+msg;
+  // 격려 문단에 이미 구절 인용이 그대로 있으면 위 구절 칸과 겹치지 않게 함
+  if(verse && msg.indexOf(verse.text)>=0) verse=null;
+  return {verse:verse, msg:msg};
+}
+function wrapText(ctx, text, maxW){
+  var lines=[], line='';
+  var words=text.split(' ');
+  words.forEach(function(w){
+    var test=line?line+' '+w:w;
+    if(ctx.measureText(test).width<=maxW){ line=test; return; }
+    if(line) lines.push(line);
+    // 한 단어가 줄보다 길면 글자 단위로 자름
+    line='';
+    for(var i=0;i<w.length;i++){
+      if(ctx.measureText(line+w[i]).width>maxW){ lines.push(line); line=w[i]; }
+      else line+=w[i];
+    }
+  });
+  if(line) lines.push(line);
+  return lines;
+}
+function clampLines(ctx, lines, max){
+  if(lines.length<=max) return lines;
+  var out=lines.slice(0,max), last=out[max-1];
+  while(last.length && ctx.measureText(last+'…').width>ctx.measureText(lines[max-1]).width) last=last.slice(0,-1);
+  out[max-1]=last.replace(/[\s,.]+$/,'')+'…';
+  return out;
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+async function drawShareCard(c, content){
+  var F="'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif";
+  try{ await Promise.all([document.fonts.load('700 40px Pretendard'),document.fonts.load('500 40px Pretendard'),document.fonts.load('400 40px Pretendard')]); }catch(e){}
+  var W=1080, H=1350, P=64, IN=72;
+  var cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  var ctx=cv.getContext('2d');
+  var GOLD='#B8952A', GOLDL='#D4AF5A', INK='#2A2318', CREAM='#FAF6EC';
+  ctx.fillStyle='#1A1610'; ctx.fillRect(0,0,W,H);
+  // 안쪽 카드
+  var cx=P, cy=P, cw=W-P*2, ch=H-P*2-70;
+  roundRect(ctx,cx,cy,cw,ch,36); ctx.fillStyle=CREAM; ctx.fill();
+  ctx.strokeStyle='rgba(184,149,42,.5)'; ctx.lineWidth=3; ctx.stroke();
+  var tw=cw-IN*2, x=cx+IN, y=cy+IN;
+  ctx.textBaseline='top';
+  // 인물
+  ctx.font='64px '+F; ctx.fillText(c.icon, x, y);
+  ctx.fillStyle=INK; ctx.font='700 52px '+F; ctx.fillText(c.name, x+92, y+2);
+  ctx.fillStyle='#8A7A60'; ctx.font='400 28px '+F;
+  ctx.fillText(clampLines(ctx,wrapText(ctx,c.intro||'',tw-92),1)[0]||'', x+92, y+66);
+  y+=128;
+  ctx.fillStyle=GOLD; ctx.fillRect(x,y,72,4); y+=4;
+  // 본문 높이를 먼저 재고, 남는 공간의 가운데에 배치
+  var VF='600 46px '+F, VL=70, MF='400 40px '+F, ML=66;
+  var vl=[], vBox=0;
+  if(content.verse){
+    ctx.font=VF; vl=clampLines(ctx,wrapText(ctx,'“'+content.verse.text+'”',tw-40),4);
+    vBox=28+vl.length*VL+10+40+28; // 위 여백 + 구절 + 장절 + 아래 여백
+  }
+  var gap=vBox?52:0, sigH=20+40;
+  var bottom=cy+ch-IN, avail=bottom-y-40;
+  ctx.font=MF;
+  var maxL=Math.max(2,Math.floor((avail-vBox-gap-sigH)/ML));
+  var ml=clampLines(ctx,wrapText(ctx,content.msg,tw),Math.min(maxL,8));
+  var total=vBox+gap+ml.length*ML+sigH;
+  y+=40+Math.max(0,Math.floor((avail-total)/2));
+  if(vBox){
+    roundRect(ctx,x,y,tw,vBox,20); ctx.fillStyle='rgba(184,149,42,.12)'; ctx.fill();
+    ctx.fillStyle=GOLD; ctx.fillRect(x,y,6,vBox);
+    ctx.fillStyle=INK; ctx.font=VF;
+    vl.forEach(function(l,i){ ctx.fillText(l, x+40, y+28+i*VL); });
+    ctx.fillStyle=GOLD; ctx.font='600 34px '+F;
+    ctx.fillText(content.verse.ref, x+40, y+28+vl.length*VL+10);
+    y+=vBox+gap;
+  }
+  ctx.fillStyle='#4A3F2E'; ctx.font=MF;
+  ml.forEach(function(l,i){ ctx.fillText(l, x, y+i*ML); });
+  y+=ml.length*ML+20;
+  ctx.fillStyle=GOLD; ctx.font='600 36px '+F; ctx.textAlign='right';
+  ctx.fillText('— '+c.name, x+tw, y);
+  ctx.textAlign='left';
+  // 하단 안내
+  var fy=cy+ch+30;
+  ctx.fillStyle=GOLDL; ctx.font='700 34px '+F; ctx.fillText('✦ 성경 인물 AI 멘토', P+8, fy);
+  ctx.fillStyle='#C9B98F'; ctx.font='400 28px '+F; ctx.textAlign='right';
+  ctx.fillText('bible.cheonha.app', W-P-8, fy+4); ctx.textAlign='left';
+  return await new Promise(function(r){ cv.toBlob(r,'image/png'); });
+}
+async function openShareCard(){
+  var last=null;
+  for(var i=messages.length-1;i>=0;i--){ if(messages[i].role==='assistant'){ last=messages[i].content; break; } }
+  if(!last){ showToast('공유할 답변이 없습니다.'); return; }
+  var c=CHARS[currentChar]; if(!c) return;
+  try{
+    shareBlob=await drawShareCard(c, pickCardContent(last));
+    if(!shareBlob) throw new Error('no blob');
+  }catch(e){ showToast('카드를 만들지 못했습니다. 다시 시도해 주세요.'); return; }
+  var img=document.getElementById('shareImg');
+  if(img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  img.dataset.url=URL.createObjectURL(shareBlob); img.src=img.dataset.url;
+  var file=new File([shareBlob],'bible-card.png',{type:'image/png'});
+  var canShare=!!(navigator.canShare && navigator.canShare({files:[file]}));
+  document.getElementById('shareSendBtn').style.display=canShare?'':'none';
+  document.getElementById('shareModal').style.display='flex';
+}
+function closeShareCard(){ document.getElementById('shareModal').style.display='none'; }
+async function sendShareCard(){
+  if(!shareBlob) return;
+  var file=new File([shareBlob],'bible-card.png',{type:'image/png'});
+  try{
+    await navigator.share({files:[file], text:'성경 인물에게 직접 물어보세요 '+SHARE_URL});
+    closeShareCard();
+  }catch(e){
+    if(e && e.name==='AbortError') return; // 사용자가 공유 창을 닫음
+    downloadShareCard();
+  }
+}
+function downloadShareCard(){
+  if(!shareBlob) return;
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(shareBlob); a.download='성경인물AI멘토_말씀카드.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  try{ navigator.clipboard && navigator.clipboard.writeText(SHARE_URL); }catch(e){}
+  showToast('이미지를 저장했어요. 주소도 복사해 두었어요.');
 }
 
 function deleteRecord(id, e){
