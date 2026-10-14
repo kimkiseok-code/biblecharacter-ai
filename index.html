@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BibleCharacter.AI — 성경 인물 AI 멘토링</title>
+<title>BibleCharacter.AI — 성경 인물 AI 멘토</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1a1610">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -407,6 +407,8 @@ body { background:#1A1610; min-height:100vh; font-family:'Pretendard',sans-serif
 .logo-mini { display:none; font-size:11px; color:var(--ink-soft); font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.04em; }
 .chat-screen .header { padding:7px 22px 7px; }
 .chat-screen .logo span { display:none; }
+.logo .logo-sub, .chat-screen .logo .logo-sub { display:inline-block; margin-left:8px; padding-left:8px; border-left:1px solid rgba(184,149,42,.4); font-size:11px; line-height:1.2; vertical-align:1px; color:var(--ink-soft); font-weight:400; }
+@media (max-width:560px) { .logo .logo-sub, .chat-screen .logo .logo-sub { display:none; } }
 .chat-screen .logo-mini { display:inline; }
 .header-right { display:flex; align-items:center; gap:10px; }
 .api-status { font-size:10px; color:#4CAF50; display:flex; align-items:center; gap:5px; }
@@ -1045,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#1a1610;align-items:center;justify-content:center;z-index:9999;flex-direction:column;">
   <div style="text-align:center;padding:40px 32px;max-width:360px;width:100%;">
     <div style="font-size:26px;color:#d4af5a;font-weight:700;letter-spacing:1px;margin-bottom:4px;">✦ BibleCharacter.AI</div>
-    <div style="font-size:12px;color:#b8952a;margin-bottom:32px;letter-spacing:0.5px;">성경 인물 AI 멘토링</div>
+    <div style="font-size:12px;color:#b8952a;margin-bottom:32px;letter-spacing:0.5px;">성경 인물 AI 멘토</div>
     <img src="/icon-192.png" onerror="this.style.display='none'" style="width:88px;height:88px;border-radius:22px;margin-bottom:28px;">
     <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:6px;">하나님은 성경 속 인물들을 통해</div>
     <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:28px;">오늘도 말씀하십니다</div>
@@ -1070,7 +1072,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="mainApp" style="display:block;">
 <div class="app">
   <div class="header">
-    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span><span class="logo-mini" id="logoMini"> · </span></div>
+    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ BibleCharacter.AI<span class="logo-sub">성경 인물 AI 멘토</span><span class="logo-mini" id="logoMini"> · </span></div>
     <div class="header-right">
       <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
   <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
