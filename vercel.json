@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [{ "type": "host", "value": "biblecharacter-ai.vercel.app" }],
+      "destination": "https://bible.cheonha.app/$1",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

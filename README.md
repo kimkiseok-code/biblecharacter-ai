@@ -35,7 +35,7 @@ Value: sk-ant-api03-xxxxx (본인 API 키)
 ```
 
 ### 4. 배포 완료
-→ https://biblecharacter-ai.vercel.app 접속 가능
+→ https://bible.cheonha.app 접속 가능
 
 ## 무료 5회 제한
 - localStorage 기반 (월별 초기화)
