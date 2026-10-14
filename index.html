@@ -1729,7 +1729,7 @@ async function sendMsg(){
     }
     if(!res.ok) throw new Error(data.error||('API 오류 '+res.status));
 
-    const reply=data.content?.[0]?.text||'응답을 받지 못했습니다.';
+    const reply=((data.content||[]).find(b=>b&&b.type==='text')||{}).text||'응답을 받지 못했습니다.';
     messages.push({role:'assistant',content:reply});
     removeTyping(); addAiMsg(formatReply(reply));
     enterAnswerMode();

@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: free ? MODEL_FREE : MODEL_PAID,
-        max_tokens: 1200,
+        max_tokens: 2000, // 새 모델은 답 전에 '생각' 블록을 쓰므로 여유 있게
         system,
         messages: trimmed,
       }),
@@ -105,8 +105,15 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: data.error?.message || 'AI 응답 오류' });
     }
 
+    // 실제 답(text) 블록만 골라 보냄 (Sonnet 5.5 등은 thinking 블록이 먼저 옴)
+    const textBlocks = (data.content || []).filter(b => b && b.type === 'text' && b.text);
+    if (!textBlocks.length) {
+      await undo(); // 빈 답이면 횟수에서 빼지 않음
+      return res.status(502).json({ error: 'AI가 답을 만들지 못했습니다. 다시 시도해 주세요' });
+    }
+
     return res.status(200).json({
-      content: data.content,
+      content: [{ type: 'text', text: textBlocks.map(b => b.text).join('\n\n') }],
       usage: usageOf(quota, c),
     });
   } catch (error) {
