@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BibleCharacter.AI — 성경 인물 AI 멘토</title>
+<title>BibleCharacter.AI — 성경 인물 AI 멘토링</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1a1610">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,136 +23,71 @@
 </script>
 
 <script>
-// 유입 출처 기록 (?from=yt 등). 처음 들어온 출처를 기억해 가입·결제와 연결
-(function(){
-  try {
-    var params = new URLSearchParams(location.search);
-    var raw = params.get('from');
-    var src = raw ? raw.toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,20) : '';
-    var first = null;
-    try { first = localStorage.getItem('bca_from'); } catch(e) {}
-    if (src && !first) { try { localStorage.setItem('bca_from', src); } catch(e) {} first = src; }
-    // 구글 로그인에서 돌아올 때 서버가 읽을 수 있게 쿠키로도 둠 (90일)
-    if (first) document.cookie = 'bca_from=' + first + '; Max-Age=7776000; Path=/; SameSite=Lax; Secure';
-    // 주소창에서 꼬리표는 지움 (다른 값은 그대로)
-    if (raw !== null) {
-      params.delete('from');
-      var q = params.toString();
-      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
-    }
-    // 방문은 창 하나당 한 번만 기록
-    var seen = null;
-    try { seen = sessionStorage.getItem('bca_visit'); sessionStorage.setItem('bca_visit', '1'); } catch(e) { seen = '1'; }
-    if (!seen && !params.get('bca_token')) {
-      fetch('/api/track', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ from: src || 'direct' }), keepalive:true }).catch(function(){});
-    }
-  } catch(e) {}
-})();
-</script>
-
-<script>
-// 로그인 상태 확인 (서명된 세션 사용) + 사용량은 서버에서 조회
+// 로그인 상태 확인 + 비로그인 3회 무료 체험
 (function() {
   var saved = localStorage.getItem('bca_user');
   if (saved) {
-    try {
-      var u = JSON.parse(saved);
-      // 예전 방식(서명 없는) 로그인 정보는 무효 → 다시 로그인 필요
-      if (u && u.session) window._currentUser = u;
-      else localStorage.removeItem('bca_user');
-    } catch(e) { localStorage.removeItem('bca_user'); }
+    try { window._currentUser = JSON.parse(saved); } catch(e) { localStorage.removeItem('bca_user'); }
   }
   var params = new URLSearchParams(window.location.search);
   var token = params.get('bca_token');
   if (token) {
-    window.history.replaceState({}, '', '/');
-    fetch('/api/verify?token=' + encodeURIComponent(token))
+    fetch('/api/verify?token=' + token)
       .then(function(r){ return r.json(); })
       .then(function(user) {
-        if(user && user.email && user.session) {
+        if(user && user.email) {
           localStorage.setItem('bca_user', JSON.stringify(user));
           window._currentUser = user;
-          showUserHeader();
+          var ui = document.getElementById('userInfo');
+if(ui) { ui.style.display='flex'; }
+var up = document.getElementById('userPhoto');
+if(up && user.picture) { up.src=user.picture; up.style.display='block'; }
+var un = document.getElementById('userName');
+if(un) un.textContent = user.name || user.email;
+updateUsageDisplay();
+          window.history.replaceState({}, '', '/');
           var lm = document.getElementById('loginPromptModal');
           if(lm) lm.style.display='none';
-          refreshUsage();
-          // 로그인 전에 누른 구매 버튼이 있으면 이어서 결제
-          var pendingPlan = localStorage.getItem('bca_pending_payment');
-          if(pendingPlan) {
-            localStorage.removeItem('bca_pending_payment');
-            setTimeout(function(){
-              if(pendingPlan.indexOf('sub:')===0) window.openSubscribe(pendingPlan.slice(4), true);
-              else window.startPayment(pendingPlan, true);
-            }, 300);
-          }
+          var countEl = document.getElementById('usageCount');
+          if(countEl) countEl.style.display='inline';
+          updateUsageDisplay();
         }
       }).catch(function(){});
   }
   document.addEventListener('DOMContentLoaded', function() {
     var ls = document.getElementById('loginScreen');
     if(ls) ls.style.display='none';
-    showUserHeader();
-    refreshUsage();
+    updateUsageDisplay();
   });
 })();
 
-// 서버 API 호출 시 로그인 세션을 함께 보냄
-function authHeaders(extra) {
-  var h = extra || {};
-  if(window._currentUser && window._currentUser.session) {
-    h['Authorization'] = 'Bearer ' + window._currentUser.session;
+window._checkGuestLimit = function() {
+  if(window._currentUser) return true;
+  if(localStorage.getItem('bca_guest_locked') === 'true') {
+    document.getElementById('loginPromptModal').style.display='flex';
+    return false;
   }
-  return h;
-}
+  var count = parseInt(localStorage.getItem('bca_guest_count') || '0');
+  if(count >= 3) {
+    localStorage.setItem('bca_guest_locked', 'true');
+    document.getElementById('loginPromptModal').style.display='flex';
+    return false;
+  }
+  localStorage.setItem('bca_guest_count', count + 1);
+  return true;
+};
 
-// 세션이 만료되었을 때: 로그아웃 처리 후 로그인 안내
-function handleSessionExpired() {
-  localStorage.removeItem('bca_user');
-  window._currentUser = null;
-  var ui = document.getElementById('userInfo');
-  if(ui) ui.style.display = 'none';
-  var lm = document.getElementById('loginPromptModal');
-  if(lm) lm.style.display = 'flex';
-}
-
-function showUserHeader() {
-  var user = window._currentUser;
-  if(!user) return;
-  var ui = document.getElementById('userInfo');
-  if(ui) ui.style.display = 'flex';
-  var up = document.getElementById('userPhoto');
-  if(up && user.picture) { up.src = user.picture; up.style.display = 'block'; }
-  var un = document.getElementById('userName');
-  if(un) un.textContent = user.name || user.email;
-}
-
-// 헤더의 사용량 표시 (u = 서버가 돌려준 {tier, used, limit})
-function renderUsage(u) {
-  var el = document.getElementById('usageCount');
-  if(!el || !u) return;
-  window._usage = u;
-  if(u.sub !== undefined) window._sub = u.sub;
-  var subTag = (window._sub && window._sub.status !== 'ended' && (u.tier==='basic'||u.tier==='premium')) ? ' 구독' : '';
-  if(u.tier === 'guest') { el.style.display = 'none'; return; }
-  var text;
-  if(u.tier === 'admin') text = '👑 관리자 모드';
-  else if(u.tier === 'premium') text = '프리미엄' + subTag + ' · 오늘 ' + u.used + '/' + u.limit + (u.totalLimit ? ' · 월 ' + (u.totalUsed||0) + '/' + u.totalLimit : '');
-  else if(u.tier === 'basic') text = '베이직' + subTag + ' ' + u.used + '/' + u.limit + '회';
-  else text = '무료 ' + u.used + '/' + u.limit + '회 사용';
-  el.textContent = text;
-  el.style.display = 'inline';
-  var full = (u.limit !== null && u.used >= u.limit) || (u.totalLimit && u.totalUsed >= u.totalLimit);
-  el.style.color = (u.tier === 'admin') ? '#B8952A' : full ? '#C07060' : '#4CAF50';
-}
-
-function refreshUsage() {
-  fetch('/api/me', { headers: authHeaders() })
-    .then(function(r){
-      if(r.status === 401) { handleSessionExpired(); return null; }
-      return r.json();
-    })
-    .then(function(u){ if(u && u.tier) renderUsage(u); })
-    .catch(function(){});
+function updateUsageDisplay() {
+  var countEl = document.getElementById('usageCount');
+  if(!countEl) return;
+  if(window._currentUser) {
+    var month = new Date().getFullYear()+'_'+(new Date().getMonth()+1);
+var used = parseInt(localStorage.getItem('bca_usage_'+month) || '0');
+    countEl.textContent = '무료 ' + used + '/3회 사용';
+    countEl.style.display = 'inline';
+  } else {
+    countEl.style.display = 'none';
+  }
 }
 
 window.toggleUserMenu = function() {
@@ -167,17 +102,7 @@ document.addEventListener('click', function(e) {
   }
 });
 
-window.startPayment = function(plan, skipAgree) {
-  // 환불정책 동의 확인 (로그인 후 자동 이어가기는 이미 동의한 상태라 건너뜀)
-  if(!skipAgree) {
-    var agree = document.getElementById('refundAgree');
-    if(!agree || !agree.checked) {
-      alert('환불정책을 확인하고 동의란에 체크해 주세요.');
-      var box = document.getElementById('refundAgreeBox');
-      if(box) { box.style.borderColor = '#C07060'; box.scrollIntoView({behavior:'smooth', block:'center'}); }
-      return;
-    }
-  }
+window.startPayment = function(plan) {
   // 비로그인 상태면 구글 로그인 유도, 로그인 후 자동으로 결제 이어가도록 의도 저장
   if(!window._currentUser) {
     localStorage.setItem('bca_pending_payment', plan);
@@ -185,6 +110,10 @@ window.startPayment = function(plan, skipAgree) {
     document.getElementById('loginPromptModal').style.display='flex';
     return;
   }
+  const amount = plan === 'basic' ? 2900 : 4900;
+  const orderName = plan === 'basic' ? 'BibleCharacter.AI 베이직 1개월 이용권' : 'BibleCharacter.AI 프리미엄 1개월 이용권';
+  const orderId = 'BCA_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+  const clientKey = 'R2_6d7910cf70de46eba6ff4fbef76ebf5f';
 
   function loadNicepay(callback) {
     if(window.AUTHNICE) { callback(); return; }
@@ -194,189 +123,25 @@ window.startPayment = function(plan, skipAgree) {
     document.head.appendChild(script);
   }
 
-  // 1) 서버가 주문(금액·주문번호)을 먼저 확정 → 2) 나이스페이 결제창
-  fetch('/api/order', {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ plan: plan })
-  })
-    .then(function(r){
-      if(r.status === 401) { handleSessionExpired(); return null; }
-      return r.json();
-    })
-    .then(function(order){
-      if(!order) return;
-      if(!order.orderId) { alert(order.error || '주문을 만들 수 없습니다. 잠시 후 다시 시도해 주세요.'); return; }
-      loadNicepay(function() {
-        AUTHNICE.requestPay({
-          clientId: order.clientId,
-          method: 'card',
-          orderId: order.orderId,
-          amount: order.amount,
-          goodsName: order.goodsName,
-          buyerName: window._currentUser.name || window._currentUser.email,
-          buyerEmail: window._currentUser.email,
-          returnUrl: window.location.origin + '/api/nicepay-confirm',
-          fnError: function(result) {
-            alert('결제 오류: ' + result.msg);
-          }
-        });
-      });
-    })
-    .catch(function(){ alert('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'); });
-};
-// ───────── 정기구독 ─────────
-var PLAN_INFO = {
-  basic:   { name:'베이직', amount:2900, desc:'매달 대화 50회' },
-  premium: { name:'프리미엄', amount:4900, desc:'매달 대화 200회 (하루 최대 30회)' }
-};
-var _subPlan = null;
-function fmtDate(ts){ return new Date(ts).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }); }
-function won(n){ return n.toLocaleString('ko-KR') + '원'; }
-
-window.openSubscribe = function(plan, skipAgree) {
-  if(!skipAgree) {
-    var agree = document.getElementById('refundAgree');
-    if(!agree || !agree.checked) {
-      alert('환불정책을 확인하고 동의란에 체크해 주세요.');
-      var box = document.getElementById('refundAgreeBox');
-      if(box) { box.style.borderColor = '#C07060'; box.scrollIntoView({behavior:'smooth', block:'center'}); }
-      return;
-    }
-  }
-  if(!window._currentUser) {
-    localStorage.setItem('bca_pending_payment', 'sub:' + plan);
-    document.getElementById('limitModal').style.display='none';
-    document.getElementById('loginPromptModal').style.display='flex';
-    return;
-  }
-  _subPlan = plan;
-  var p = PLAN_INFO[plan];
-  var first = Date.now();
-  var next = new Date(first); next.setMonth(next.getMonth()+1);
-  document.getElementById('subTitle').textContent = p.name + ' 정기구독 시작';
-  document.getElementById('subNotice').innerHTML =
-    '<b>' + p.name + ' · 월 ' + won(p.amount) + '</b> — ' + p.desc + '<br>' +
-    '· 오늘 첫 달 ' + won(p.amount) + '이 결제되고, <b>매월 ' + new Date(first).getDate() + '일경 같은 금액이 자동 결제</b>됩니다. (다음 결제 예정: ' + fmtDate(next) + ')<br>' +
-    '· 언제든 <b>구독 관리</b>에서 해지할 수 있고, 해지해도 결제한 기간이 끝날 때까지 이용할 수 있습니다.<br>' +
-    '· 결제 후 7일 이내, 대화를 이용하지 않았다면 전액 환불됩니다. <a href="/refund.html" target="_blank" style="color:var(--gold);">환불정책</a>';
-  document.getElementById('subAgreeText').innerHTML = '매월 <b>' + won(p.amount) + '</b>이 등록한 카드로 <b>자동 결제</b>되는 것에 동의합니다. (<a href="/terms.html" target="_blank" style="color:var(--gold);">이용약관</a>)';
-  document.getElementById('subSubmit').textContent = won(p.amount) + ' 결제하고 구독 시작';
-  ['subCardNo','subExp','subPw','subIdNo'].forEach(function(id){ document.getElementById(id).value=''; });
-  document.getElementById('subAgree').checked = false;
-  document.getElementById('subError').style.display = 'none';
-  document.getElementById('limitModal').style.display = 'none';
-  document.getElementById('subModal').style.display = 'flex';
-};
-
-window.closeSubscribe = function() {
-  ['subCardNo','subExp','subPw','subIdNo'].forEach(function(id){ document.getElementById(id).value=''; });
-  document.getElementById('subModal').style.display = 'none';
-};
-
-function subError(msg) {
-  var e = document.getElementById('subError');
-  e.textContent = msg; e.style.display = 'block';
-}
-
-window.submitSubscribe = function() {
-  var cardNo = document.getElementById('subCardNo').value.replace(/\D/g,'');
-  var exp = document.getElementById('subExp').value.replace(/\D/g,'');
-  var pw = document.getElementById('subPw').value.replace(/\D/g,'');
-  var idNo = document.getElementById('subIdNo').value.replace(/\D/g,'');
-  if(cardNo.length < 14) return subError('카드번호를 확인해 주세요.');
-  if(exp.length !== 4) return subError('유효기간을 MM/YY 형식으로 입력해 주세요.');
-  if(pw.length !== 2) return subError('카드 비밀번호 앞 2자리를 입력해 주세요.');
-  if(idNo.length !== 6 && idNo.length !== 10) return subError('생년월일 6자리(법인카드는 사업자번호 10자리)를 입력해 주세요.');
-  if(!document.getElementById('subAgree').checked) return subError('자동결제 동의에 체크해 주세요.');
-  var btn = document.getElementById('subSubmit');
-  var label = btn.textContent;
-  btn.disabled = true; btn.textContent = '결제 진행 중… 창을 닫지 마세요';
-  document.getElementById('subError').style.display = 'none';
-  fetch('/api/subscribe', {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ action:'start', plan:_subPlan, cardNo:cardNo, expMonth:exp.slice(0,2), expYear:exp.slice(2), cardPw:pw, idNo:idNo, agree:true })
-  }).then(function(r){ return r.json().then(function(d){ d._s = r.status; return d; }); })
-    .then(function(d){
-      btn.disabled = false; btn.textContent = label;
-      if(d._s === 401) { closeSubscribe(); handleSessionExpired(); return; }
-      if(!d.ok) { subError(d.error || '처리하지 못했습니다.'); return; }
-      closeSubscribe();
-      refreshUsage();
-      alert(PLAN_INFO[d.plan].name + ' 정기구독이 시작됐어요! 🙏\n다음 결제 예정일: ' + fmtDate(d.nextBillingAt) + '\n구독 관리는 오른쪽 위 이름 메뉴에서 할 수 있어요.');
-    })
-    .catch(function(){
-      btn.disabled = false; btn.textContent = label;
-      subError('네트워크 오류가 발생했습니다. 결제가 되었는지 구독 관리에서 확인한 뒤 다시 시도해 주세요.');
+  loadNicepay(function() {
+    AUTHNICE.requestPay({
+      clientId: clientKey,
+      method: 'card',
+      orderId: orderId,
+      amount: amount,
+      goodsName: orderName,
+      buyerName: window._currentUser.name || window._currentUser.email,
+      buyerEmail: window._currentUser.email,
+      returnUrl: window.location.origin + '/api/nicepay-confirm',
+      fnError: function(result) {
+        alert('결제 오류: ' + result.msg);
+      }
     });
-};
-
-// 카드번호 4자리씩, 유효기간 MM/YY 자동 서식
-document.addEventListener('input', function(e){
-  if(e.target.id === 'subCardNo') {
-    var v = e.target.value.replace(/\D/g,'').slice(0,16);
-    e.target.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
-  } else if(e.target.id === 'subExp') {
-    var x = e.target.value.replace(/\D/g,'').slice(0,4);
-    e.target.value = x.length > 2 ? x.slice(0,2) + '/' + x.slice(2) : x;
-  }
-});
-
-window.openManage = function() {
-  var menu = document.getElementById('userMenu'); if(menu) menu.style.display='none';
-  var body = document.getElementById('manageBody');
-  body.innerHTML = '불러오는 중…';
-  document.getElementById('manageModal').style.display = 'flex';
-  fetch('/api/me', { headers: authHeaders() }).then(function(r){
-    if(r.status === 401) { document.getElementById('manageModal').style.display='none'; handleSessionExpired(); return null; }
-    return r.json();
-  }).then(function(u){
-    if(!u) return;
-    renderUsage(u);
-    var s = u.sub;
-    if(!s) {
-      var pass = (u.tier === 'basic' || u.tier === 'premium') && u.expiresAt
-        ? '<div class="manage-row"><span>한 달 이용권</span><b>' + fmtDate(u.expiresAt) + '까지</b></div>' : '';
-      body.innerHTML = pass + '<div style="margin-top:10px;">이용 중인 정기구독이 없습니다.</div>' +
-        '<button class="manage-btn" style="background:var(--gold);border:none;color:var(--ink);" onclick="document.getElementById(\'manageModal\').style.display=\'none\';showLimitModal(\'free\')">이용권 / 구독 보기</button>';
-      return;
-    }
-    var p = PLAN_INFO[s.plan];
-    var rows =
-      '<div class="manage-row"><span>상품</span><b>' + p.name + ' 정기구독</b></div>' +
-      '<div class="manage-row"><span>금액</span><b>월 ' + won(s.amount) + '</b></div>' +
-      '<div class="manage-row"><span>결제 카드</span><b>' + (s.cardName || '카드') + ' ****' + (s.last4 || '') + '</b></div>';
-    if(s.status === 'active') {
-      rows += '<div class="manage-row"><span>다음 결제일</span><b>' + fmtDate(s.periodEnd) + '</b></div>';
-      if(s.failCount > 0) rows += '<div style="color:#B5533F;font-size:12px;margin-top:8px;">⚠️ 최근 자동 결제에 실패했어요. 카드 한도나 상태를 확인해 주세요. (3회 실패 시 구독이 종료됩니다)</div>';
-      rows += '<button class="manage-btn" style="background:white;border:1px solid #B5533F;color:#B5533F;" onclick="cancelSub()">구독 해지</button>';
-    } else {
-      rows += '<div class="manage-row"><span>상태</span><b style="color:#B5533F;">해지 예약됨</b></div>' +
-              '<div class="manage-row"><span>이용 가능</span><b>' + fmtDate(s.periodEnd) + '까지</b></div>' +
-              '<div style="font-size:12px;margin-top:8px;">이후에는 자동 결제되지 않습니다.</div>' +
-              '<button class="manage-btn" style="background:var(--gold);border:none;color:var(--ink);" onclick="resumeSub()">해지 취소하고 계속 구독</button>';
-    }
-    body.innerHTML = rows;
-  }).catch(function(){ body.innerHTML = '불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'; });
-};
-
-function subAction(action, confirmMsg, doneMsg) {
-  if(confirmMsg && !confirm(confirmMsg)) return;
-  fetch('/api/subscribe', { method:'POST', headers: authHeaders({ 'Content-Type':'application/json' }), body: JSON.stringify({ action: action }) })
-    .then(function(r){ return r.json(); })
-    .then(function(d){ if(d.ok) { alert(doneMsg(d)); openManage(); } else alert(d.error || '처리하지 못했습니다.'); })
-    .catch(function(){ alert('네트워크 오류가 발생했습니다.'); });
-}
-window.cancelSub = function() {
-  subAction('cancel', '정기구독을 해지할까요?\n이미 결제한 기간이 끝날 때까지는 계속 이용할 수 있습니다.',
-    function(d){ return '해지되었습니다. ' + fmtDate(d.usableUntil) + '까지 이용하실 수 있어요.'; });
-};
-window.resumeSub = function() {
-  subAction('resume', null, function(d){ return '구독을 계속합니다. 다음 결제일: ' + fmtDate(d.nextBillingAt); });
+  });
 };
   window.doLogout = function() {
   localStorage.removeItem('bca_user');
+  localStorage.setItem('bca_guest_locked', 'true');
   window._currentUser = null;
   var ui = document.getElementById('userInfo');
   if(ui) ui.style.display = 'none';
@@ -434,7 +199,8 @@ body { background:#1A1610; min-height:100vh; font-family:'Pretendard',sans-serif
 .logo span { color:var(--ink-soft); font-size:11px; display:block; font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.02em; transition:all .3s ease; }
 .logo-mini { display:none; font-size:11px; color:var(--ink-soft); font-family:'Pretendard',sans-serif; font-weight:400; letter-spacing:0.04em; }
 .chat-screen .header { padding:7px 22px 7px; }
-.chat-screen .logo span { display:none; }.chat-screen .logo-mini { display:inline; }
+.chat-screen .logo span { display:none; }
+.chat-screen .logo-mini { display:inline; }
 .header-right { display:flex; align-items:center; gap:10px; }
 .api-status { font-size:10px; color:#4CAF50; display:flex; align-items:center; gap:5px; }
 .status-dot { width:6px; height:6px; background:#4CAF50; border-radius:50%; }
@@ -762,17 +528,6 @@ textarea:focus { border-color:var(--gold); }
 }
 .btn-save2:hover { background:#9A7A1E; }
 
-/* 말씀 카드 공유 */
-.share-modal { display:none; position:fixed; inset:0; background:rgba(20,16,10,.82); z-index:3000; align-items:center; justify-content:center; padding:16px; }
-.share-box { background:#FAF6EC; border-radius:16px; padding:16px; width:100%; max-width:400px; max-height:100%; display:flex; flex-direction:column; gap:12px; }
-.share-box img { width:100%; max-height:62vh; object-fit:contain; border-radius:10px; background:#2A2318; }
-.share-note { font-size:12px; color:#8A7A60; text-align:center; line-height:1.5; }
-.share-btns { display:flex; gap:8px; }
-.share-btns button { flex:1; border-radius:12px; padding:12px; font-family:'Pretendard',sans-serif; font-size:14px; font-weight:600; cursor:pointer; border:none; }
-.share-btns .sb-main { background:var(--gold); color:var(--ink); }
-.share-btns .sb-sub { background:var(--gold-pale); border:1px solid rgba(184,149,42,.4); color:var(--ink-mid); }
-.share-close { background:none; border:none; color:#8A7A60; font-size:13px; cursor:pointer; padding:4px; font-family:'Pretendard',sans-serif; }
-
 /* 예시 보기 토글 */
 .quick-toggle {
   padding:6px 16px 0;
@@ -908,6 +663,10 @@ textarea:focus { border-color:var(--gold); }
 }
 .change-char-btn:hover { border-color:var(--gold); color:var(--gold); }
 </style>
+<script>
+window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <div class="container">
@@ -916,93 +675,33 @@ textarea:focus { border-color:var(--gold); }
   <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:32px 24px;max-width:380px;width:100%;text-align:center;">
     <div style="font-size:28px;margin-bottom:8px;">✦</div>
     <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 14px;border-radius:2px;"></div>
-    <div id="limitTitle" style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 달 무료 대화를 모두 사용하셨어요</div>
-    <div id="limitDesc" style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏</div>
-
-    <div id="refundAgreeBox" style="background:white;border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:10px 12px;margin-bottom:16px;text-align:left;font-family:'Pretendard',sans-serif;font-size:11.5px;color:var(--ink-mid);line-height:1.7;">
-      디지털 이용권 특성상 <strong>결제 후 대화를 1회라도 이용하면 청약철회(환불)가 제한</strong>됩니다. 미사용 시 결제일로부터 7일 이내 환불 가능합니다. 자세한 내용은 <a href="/refund.html" target="_blank" style="color:var(--gold);">환불정책</a>을 확인해 주세요.
-      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;font-weight:600;color:var(--ink);">
-        <input type="checkbox" id="refundAgree" style="width:16px;height:16px;accent-color:#B8952A;">
-        환불정책을 확인했으며 이에 동의합니다
-      </label>
-    </div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px;">이번 이용권의 무료 횟수를 다 쓰셨어요</div>
+    <div style="font-family:'Pretendard',sans-serif;font-size:13px;color:var(--ink-mid);line-height:1.8;margin-bottom:20px;">말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏</div>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
       <div style="background:white;border:1.5px solid rgba(184,149,42,0.4);border-radius:14px;padding:14px 16px;text-align:left;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직</span>
-          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">2,900원<small style="font-size:11px;font-weight:600;"> / 한 달</small></span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);">베이직 1개월 이용권</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">2,900원</span>
         </div>
-<div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:#8A6A10;margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">성경 인물 AI 대화 50회 · 대화(신앙 기록) 저장 및 열람</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-          <div><button onclick="startPayment('basic')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:white;border:1px solid rgba(184,149,42,0.45);color:var(--ink-mid);font-weight:600;">한 달 이용권</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">자동결제 없음<br>한 달 뒤 자동 종료</div></div>
-          <div><button onclick="openSubscribe('basic')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.6);color:var(--ink);font-weight:700;">정기구독</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">매월 자동결제<br>언제든 해지</div></div>
-        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 50회 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
+        <button onclick="startPayment('basic')" style="margin-top:10px;width:100%;background:var(--gold-pale);border:1px solid rgba(184,149,42,0.4);border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:600;color:var(--ink-mid);cursor:pointer;">베이직 이용권 구매</button>
       </div>
 
       <div style="background:var(--ink);border:1.5px solid var(--gold);border-radius:14px;padding:14px 16px;text-align:left;position:relative;">
         <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);font-family:'Pretendard',sans-serif;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">추천</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄</span>
-          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원<small style="font-size:11px;font-weight:600;"> / 한 달</small></span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--gold-light);">프리미엄 1개월 이용권</span>
+          <span style="font-family:'Pretendard',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">4,900원</span>
         </div>
-<div style="font-family:'Pretendard',sans-serif;font-size:12.5px;font-weight:700;color:var(--gold-light);margin-bottom:3px;">✦ 고급 AI 모델로 더 깊이 있는 답변</div>
-        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">성경 인물 AI 대화 200회(매일 최대 30회) · 대화(신앙 기록) 저장 및 열람</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-          <div><button onclick="startPayment('premium')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:transparent;border:1px solid rgba(232,212,138,0.5);color:var(--gold-light);font-weight:600;">한 달 이용권</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">자동결제 없음<br>한 달 뒤 자동 종료</div></div>
-          <div><button onclick="openSubscribe('premium')" style="width:100%;border-radius:8px;padding:9px 6px;font-family:'Pretendard',sans-serif;font-size:12.5px;cursor:pointer;background:var(--gold);border:none;color:var(--ink);font-weight:700;">정기구독</button><div style="font-family:'Pretendard',sans-serif;font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:4px;line-height:1.4;">매월 자동결제<br>언제든 해지</div></div>
-        </div>
+        <div style="font-family:'Pretendard',sans-serif;font-size:12px;color:var(--ink-soft);line-height:1.6;">이용기간 1개월 · 성경 인물 AI 대화 횟수 무제한 제공 · 대화(신앙 기록) 저장 및 열람 기능 포함</div>
+        <button onclick="startPayment('premium')" style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;padding:9px;font-family:'Pretendard',sans-serif;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">프리미엄 이용권 구매</button>
       </div>
     </div>
 
     <button onclick="closeLimitModal()" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">다음에 다시 이용하기</button>
   </div>
 </div>
-
-<!-- 정기구독: 카드 등록 -->
-<div id="subModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.9);align-items:center;justify-content:center;z-index:1001;padding:16px;overflow-y:auto;">
-  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:24px 20px;max-width:380px;width:100%;font-family:'Pretendard',sans-serif;margin:auto;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:16px;font-weight:700;color:var(--ink);" id="subTitle">정기구독 시작</div>
-      <button onclick="closeSubscribe()" style="background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;">✕</button>
-    </div>
-    <div style="background:var(--gold-pale);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--ink-mid);line-height:1.75;margin-bottom:14px;" id="subNotice"></div>
-    <div class="sub-field"><label>카드번호</label><input id="subCardNo" inputmode="numeric" autocomplete="cc-number" maxlength="19" placeholder="0000 0000 0000 0000"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div class="sub-field"><label>유효기간 (월/년)</label><input id="subExp" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY"></div>
-      <div class="sub-field"><label>비밀번호 앞 2자리</label><input id="subPw" type="password" inputmode="numeric" maxlength="2" placeholder="••"></div>
-    </div>
-    <div class="sub-field"><label>생년월일 6자리 <span style="font-weight:400;color:var(--ink-soft);">(법인카드는 사업자번호 10자리)</span></label><input id="subIdNo" inputmode="numeric" maxlength="10" placeholder="YYMMDD"></div>
-    <div style="font-size:11px;color:var(--ink-soft);line-height:1.6;margin:2px 0 10px;">🔒 카드 정보는 저장하지 않고 암호화하여 결제대행사(나이스페이)에만 전달됩니다.</div>
-    <label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;color:var(--ink);line-height:1.6;cursor:pointer;margin-bottom:12px;">
-      <input type="checkbox" id="subAgree" style="width:16px;height:16px;margin-top:2px;accent-color:#B8952A;flex-shrink:0;">
-      <span id="subAgreeText"></span>
-    </label>
-    <div id="subError" style="display:none;font-size:12px;color:#B5533F;background:rgba(181,83,63,0.08);border-radius:8px;padding:8px 10px;margin-bottom:10px;"></div>
-    <button id="subSubmit" onclick="submitSubscribe()" style="width:100%;background:var(--gold);border:none;border-radius:10px;padding:12px;font-family:'Pretendard',sans-serif;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;"></button>
-  </div>
-</div>
-
-<!-- 정기구독: 구독 관리 -->
-<div id="manageModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.9);align-items:center;justify-content:center;z-index:1001;padding:16px;">
-  <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:24px 20px;max-width:360px;width:100%;font-family:'Pretendard',sans-serif;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-size:16px;font-weight:700;color:var(--ink);">💳 구독 관리</div>
-      <button onclick="document.getElementById('manageModal').style.display='none'" style="background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;">✕</button>
-    </div>
-    <div id="manageBody" style="font-size:13px;color:var(--ink-mid);line-height:1.9;"></div>
-  </div>
-</div>
-<style>
-.sub-field { margin-bottom:10px; }
-.sub-field label { display:block; font-size:12px; font-weight:600; color:var(--ink-mid); margin-bottom:4px; }
-.sub-field input { width:100%; border:1px solid var(--border); border-radius:8px; padding:10px 11px; font-family:'Pretendard',sans-serif; font-size:15px; background:white; color:var(--ink); outline:none; letter-spacing:0.03em; }
-.sub-field input:focus { border-color:var(--gold); }
-.manage-row { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); padding:6px 0; }
-.manage-row b { color:var(--ink); font-weight:600; }
-.manage-btn { width:100%; margin-top:14px; border-radius:10px; padding:11px; font-family:'Pretendard',sans-serif; font-size:13px; font-weight:600; cursor:pointer; }
-</style>
 
 <div id="loginPromptModal" style="display:none;position:fixed;inset:0;background:rgba(26,22,16,0.88);align-items:center;justify-content:center;z-index:9999;padding:20px;">
   <div style="background:var(--parchment);border:1px solid rgba(184,149,42,0.4);border-radius:18px;padding:36px 28px;max-width:360px;width:100%;text-align:center;">
@@ -1014,7 +713,6 @@ textarea:focus { border-color:var(--gold); }
       <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
       Google로 계속하기
     </button>
-    <div style="font-family:'Pretendard',sans-serif;font-size:11px;color:var(--ink-soft);line-height:1.7;margin-bottom:8px;">로그인 시 <a href="/terms.html" target="_blank" style="color:var(--gold);">이용약관</a> 및 <a href="/privacy.html" target="_blank" style="color:var(--gold);">개인정보처리방침</a>에 동의합니다</div>
     <button onclick="document.getElementById('loginPromptModal').style.display='none'" style="background:transparent;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'Pretendard',sans-serif;padding:6px;">나중에 하기</button>
   </div>
 </div>
@@ -1082,7 +780,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <div id="loginScreen" style="display:flex;position:fixed;inset:0;background:#1a1610;align-items:center;justify-content:center;z-index:9999;flex-direction:column;">
   <div style="text-align:center;padding:40px 32px;max-width:360px;width:100%;">
-    <div style="font-size:26px;color:#d4af5a;font-weight:700;letter-spacing:1px;margin-bottom:32px;">✦ 성경 인물 AI 멘토</div>
+    <div style="font-size:26px;color:#d4af5a;font-weight:700;letter-spacing:1px;margin-bottom:4px;">✦ BibleCharacter.AI</div>
+    <div style="font-size:12px;color:#b8952a;margin-bottom:32px;letter-spacing:0.5px;">성경 인물 AI 멘토링</div>
     <img src="/icon-192.png" onerror="this.style.display='none'" style="width:88px;height:88px;border-radius:22px;margin-bottom:28px;">
     <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:6px;">하나님은 성경 속 인물들을 통해</div>
     <div style="font-size:15px;color:#e8d48a;font-weight:500;margin-bottom:28px;">오늘도 말씀하십니다</div>
@@ -1100,21 +799,20 @@ document.addEventListener('DOMContentLoaded', function(){
   <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
   Google로 시작하기
 </button>
-    <div style="font-size:11px;color:#6b5a2a;margin-top:16px;line-height:1.7;">로그인 후 3회 무료 대화 제공<br>로그인 시 <a href="/terms.html" target="_blank" style="color:#b8952a;">이용약관</a> 및 <a href="/privacy.html" target="_blank" style="color:#b8952a;">개인정보처리방침</a>에 동의합니다</div>
+    <div style="font-size:11px;color:#6b5a2a;margin-top:16px;line-height:1.7;">로그인 후 3회 무료 대화 제공 · 로그인 시 이용약관에 동의합니다</div>
   </div>
 </div>
 
 <div id="mainApp" style="display:block;">
 <div class="app">
   <div class="header">
-    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ 성경 인물 AI 멘토<span class="logo-mini" id="logoMini"> · </span></div>
+    <div class="logo" onclick="goHome()" style="cursor:pointer;">✦ BibleCharacter.AI<span>성경 인물 AI 멘토링</span><span class="logo-mini" id="logoMini"> · </span></div>
     <div class="header-right">
       <div id="userInfo" style="display:none;align-items:center;gap:6px;cursor:pointer;position:relative;" onclick="toggleUserMenu()">
   <img id="userPhoto" src="" style="width:24px;height:24px;border-radius:50%;display:none;border:1px solid var(--gold);">
   <span id="userName" style="font-size:11px;color:var(--gold);max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
   <span style="font-size:10px;color:var(--ink-soft);">▾</span>
   <div id="userMenu" style="display:none;position:absolute;top:32px;right:0;background:var(--ink);border:1px solid rgba(184,149,42,0.3);border-radius:10px;padding:6px;min-width:120px;z-index:999;">
-    <button onclick="openManage()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">💳 구독 관리</button>
     <button onclick="doLogout()" style="width:100%;background:transparent;border:none;color:#e8d48a;font-size:12px;font-family:'Pretendard',sans-serif;padding:8px 12px;cursor:pointer;text-align:left;border-radius:6px;" onmouseover="this.style.background='rgba(184,149,42,0.2)'" onmouseout="this.style.background='transparent'">🚪 로그아웃</button>
   </div>
 </div>
@@ -1124,7 +822,7 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
   <div class="select-title-area" id="selectTitleArea">
-    <div class="select-logo">✦ 성경 인물 AI 멘토</div>
+    <div class="select-logo">✦ BibleCharacter.AI</div>
     <div class="select-divider"></div>
     <div class="select-title">하나님은 성경 속 인물들을 통해<br>오늘도 말씀하십니다</div>
     <div class="select-sub">마음의 짐을 함께 나눌 분을 선택하세요 🙏</div>
@@ -1150,21 +848,9 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="answer-actions" id="answerActions">
     <div class="btn-row">
       <button class="btn-again" onclick="askAgain()">🔄 다시 묻기</button>
-      <button class="btn-again" onclick="openShareCard()">📤 카드 공유</button>
       <button class="btn-save2" onclick="saveRecord()">💾 저장하기</button>
     </div>
     <button class="btn-home" onclick="goHome()">🏠 처음으로</button>
-  </div>
-  <div class="share-modal" id="shareModal" onclick="if(event.target===this)closeShareCard()">
-    <div class="share-box">
-      <img id="shareImg" alt="말씀 카드 미리보기">
-      <div class="share-note">대화 중 남기신 고민은 카드에 들어가지 않습니다.</div>
-      <div class="share-btns">
-        <button class="sb-main" id="shareSendBtn" onclick="sendShareCard()">카톡 등으로 공유하기</button>
-        <button class="sb-sub" onclick="downloadShareCard()">이미지 저장</button>
-      </div>
-      <button class="share-close" onclick="closeShareCard()">닫기</button>
-    </div>
   </div>
   <div class="input-area">
     <textarea id="msgInput" placeholder="오늘 마음의 짐을 나눠보세요..." onkeydown="handleKey(event)"></textarea>
@@ -1361,14 +1047,28 @@ const OT_ORDER=['noah','abraham','sarah','joseph','moses','joshua','gideon','han
 const NT_ORDER=['peter','paul','silas','stephen','john','mary'];
 
 let currentChar='', messages=[], isLoading=false;
-let convId=0; // 인물을 바꾸거나 처음으로 가면 증가 → 늦게 온 답변 구분용
 
 function startApp(){
-  buildCharBars();
+  buildCharBars(); initUsage(); updateUserInfo();
   var wo = document.getElementById('welcomeOverlay');
   if(wo) { wo.style.display='flex'; wo.style.opacity='1'; }
   window._startAppAfterLogin = startApp;
-  // 로그인 직후 결제 이어가기는 상단 로그인 처리 스크립트에서 함
+
+  // 로그인 후 결제 이어가기
+  var pendingPlan = localStorage.getItem('bca_pending_payment');
+  if(pendingPlan && window._currentUser) {
+    localStorage.removeItem('bca_pending_payment');
+    setTimeout(function(){ window.startPayment(pendingPlan); }, 300);
+  }
+}
+
+function updateUserInfo(){
+  var user = window._currentUser;
+  if(!user) return;
+  var photo = document.getElementById('userPhoto');
+  var name = document.getElementById('userName');
+  if(photo && user.photoURL){ photo.src=user.photoURL; photo.style.display='block'; }
+  if(name) name.textContent = user.displayName ? user.displayName.split(' ')[0] : '';
 }
 
 function showUserMenu(){
@@ -1405,8 +1105,21 @@ function buildCharBars(){
     });
   }
 }
+function initUsage(){
+  // URL에 ?admin=asadal 이면 관리자 모드 활성화
+  var params=new URLSearchParams(window.location.search);
+  if(params.get('admin')==='asadal'){
+    localStorage.setItem('bca_admin','true');
+  }
+  var isAdmin=localStorage.getItem('bca_admin')==='true'||(window._currentUser&&window._currentUser.email==='onsign@gmail.com');
+  if(isAdmin){
+    updateUsageDisplay(-1);
+  } else {
+    var u=parseInt(localStorage.getItem('bca_usage_'+getMonthKey())||'0');
+    updateUsageDisplay(u);
+  }
+}
 function selectChar(id){
-  convId++; resetLoading();
   currentChar=id; messages=[]; hideSaveBar();
   var qb=document.getElementById('quickBtns'); if(qb) qb.classList.remove('open');
   var tb=document.getElementById('quickToggleBtn'); if(tb) tb.innerHTML='<span id="quickToggleIcon">▾</span> 예시 보기';
@@ -1519,7 +1232,6 @@ function enterChatScreen(){
   if(mini) mini.textContent=' · '+(CHARS[currentChar]?CHARS[currentChar].icon+' '+CHARS[currentChar].name:'');
 }
 function goSelectScreen(){
-  convId++; resetLoading();
   document.querySelector('.app').classList.remove('chat-screen');
   document.querySelector('.app').classList.remove('answer-mode');
   exitAnswerMode();
@@ -1558,26 +1270,30 @@ function askAgain(){
   exitAnswerMode();
   document.getElementById('msgInput').focus();
 }
-function showLimitModal(tier, reason){
-  var t=document.getElementById('limitTitle');
-  var d=document.getElementById('limitDesc');
-  if(reason==='cap'){
-    t.textContent='오늘 준비된 무료 대화가 모두 소진됐어요';
-    d.innerHTML='무료 대화는 매일 자정에 다시 열립니다.<br>지금 바로 이어가시려면 이용권을 선택해 주세요 🙏';
-  } else {
-    t.textContent = tier==='basic' ? '이용권의 대화 50회를 모두 사용하셨어요'
-      : tier==='premium' ? '이용권의 대화 200회를 모두 사용하셨어요'
-      : '이번 달 무료 대화를 모두 사용하셨어요';
-    d.innerHTML='말씀의 동행을 계속하고 싶으시다면<br>아래 이용권을 선택해 주세요 🙏';
-  }
-  document.getElementById('limitModal').style.display='flex';
+function getMonthKey(){
+  var d=new Date();
+  return d.getFullYear()+'_'+(d.getMonth()+1);
 }
-// 결제 권유 없이 안내만 보여주는 말풍선 (이미 이용권이 있는 회원용)
-function showNotice(html){
-  var ca=document.getElementById('chatArea');
-  var div=document.createElement('div'); div.className='msg msg-ai';
-  div.innerHTML='<div class="avatar">🕊️</div><div class="bubble">'+html+'</div>';
-  ca.appendChild(div); ca.scrollTop=ca.scrollHeight;
+function updateUsageDisplay(count){
+  var plan = localStorage.getItem('bca_plan');
+var planMonth = localStorage.getItem('bca_plan_month');
+var currentMonth = getMonthKey();
+var LIMIT = (plan && planMonth === currentMonth)
+  ? (plan === 'premium' ? 99999 : 50)
+  : 3;
+  var el=document.getElementById('usageCount');
+  if(!el) return;
+  if(count===-1){
+    el.textContent='👑 관리자 모드';
+    el.style.color='#B8952A';
+  } else {
+    el.textContent='무료 '+count+'/'+LIMIT+'회 사용';
+    if(count>=LIMIT) el.style.color='#C07060';
+    else el.style.color='#4CAF50';
+  }
+}
+function showLimitModal(){
+  document.getElementById('limitModal').style.display='flex';
 }
 function closeLimitModal(){
   document.getElementById('limitModal').style.display='none';
@@ -1621,151 +1337,6 @@ function saveRecord(){
   saveRecords(arr);
   hideSaveBar();
   showToast('💾 신앙 기록이 저장되었습니다 🙏');
-}
-
-// ── 말씀 카드 공유 ──────────────────────────
-// 마지막 답변에서 성경 구절 1개 + 마지막 격려 문단만 뽑아 이미지로 만듦 (사용자 고민 글은 넣지 않음)
-var shareBlob=null;
-var SHARE_URL='https://bible.cheonha.app/?from=share';
-
-function cleanReplyText(t){
-  return String(t||'').replace(/^#{1,6}\s+/gm,'').replace(/\*\*/g,'').replace(/\*/g,'').replace(/^>\s?/gm,'');
-}
-function pickCardContent(reply){
-  var main=cleanReplyText(reply).split('---')[0].trim();
-  var verse=null;
-  // 답변은 공감 → 격려 순서라 뒤쪽 구절이 더 희망적임 → 마지막 인용 구절을 고름
-  var re=/["“]([^"”]{6,140})["”]\s*\(([가-힣]{1,8}\s?\d+:\d+(?:\s?[-~,]\s?\d+)*)\)/g, m;
-  while((m=re.exec(main))) verse={text:m[1].trim(), ref:m[2].trim()};
-  var paras=main.split(/\n\s*\n/).map(function(p){return p.replace(/\s*\n\s*/g,' ').trim();}).filter(Boolean);
-  var msg=paras.length?paras[paras.length-1]:'';
-  if(msg.length<40 && paras.length>1) msg=paras[paras.length-2]+' '+msg;
-  // 격려 문단에 이미 구절 인용이 그대로 있으면 위 구절 칸과 겹치지 않게 함
-  if(verse && msg.indexOf(verse.text)>=0) verse=null;
-  return {verse:verse, msg:msg};
-}
-function wrapText(ctx, text, maxW){
-  var lines=[], line='';
-  var words=text.split(' ');
-  words.forEach(function(w){
-    var test=line?line+' '+w:w;
-    if(ctx.measureText(test).width<=maxW){ line=test; return; }
-    if(line) lines.push(line);
-    // 한 단어가 줄보다 길면 글자 단위로 자름
-    line='';
-    for(var i=0;i<w.length;i++){
-      if(ctx.measureText(line+w[i]).width>maxW){ lines.push(line); line=w[i]; }
-      else line+=w[i];
-    }
-  });
-  if(line) lines.push(line);
-  return lines;
-}
-function clampLines(ctx, lines, max){
-  if(lines.length<=max) return lines;
-  var out=lines.slice(0,max), last=out[max-1];
-  while(last.length && ctx.measureText(last+'…').width>ctx.measureText(lines[max-1]).width) last=last.slice(0,-1);
-  out[max-1]=last.replace(/[\s,.]+$/,'')+'…';
-  return out;
-}
-function roundRect(ctx,x,y,w,h,r){
-  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
-}
-async function drawShareCard(c, content){
-  var F="'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif";
-  try{ await Promise.all([document.fonts.load('700 40px Pretendard'),document.fonts.load('500 40px Pretendard'),document.fonts.load('400 40px Pretendard')]); }catch(e){}
-  var W=1080, H=1350, P=64, IN=72;
-  var cv=document.createElement('canvas'); cv.width=W; cv.height=H;
-  var ctx=cv.getContext('2d');
-  var GOLD='#B8952A', GOLDL='#D4AF5A', INK='#2A2318', CREAM='#FAF6EC';
-  ctx.fillStyle='#1A1610'; ctx.fillRect(0,0,W,H);
-  // 안쪽 카드
-  var cx=P, cy=P, cw=W-P*2, ch=H-P*2-70;
-  roundRect(ctx,cx,cy,cw,ch,36); ctx.fillStyle=CREAM; ctx.fill();
-  ctx.strokeStyle='rgba(184,149,42,.5)'; ctx.lineWidth=3; ctx.stroke();
-  var tw=cw-IN*2, x=cx+IN, y=cy+IN;
-  ctx.textBaseline='top';
-  // 인물
-  ctx.font='64px '+F; ctx.fillText(c.icon, x, y);
-  ctx.fillStyle=INK; ctx.font='700 52px '+F; ctx.fillText(c.name, x+92, y+2);
-  ctx.fillStyle='#8A7A60'; ctx.font='400 28px '+F;
-  ctx.fillText(clampLines(ctx,wrapText(ctx,c.intro||'',tw-92),1)[0]||'', x+92, y+66);
-  y+=128;
-  ctx.fillStyle=GOLD; ctx.fillRect(x,y,72,4); y+=4;
-  // 본문 높이를 먼저 재고, 남는 공간의 가운데에 배치
-  var VF='600 46px '+F, VL=70, MF='400 40px '+F, ML=66;
-  var vl=[], vBox=0;
-  if(content.verse){
-    ctx.font=VF; vl=clampLines(ctx,wrapText(ctx,'“'+content.verse.text+'”',tw-40),4);
-    vBox=28+vl.length*VL+10+40+28; // 위 여백 + 구절 + 장절 + 아래 여백
-  }
-  var gap=vBox?52:0, sigH=20+40;
-  var bottom=cy+ch-IN, avail=bottom-y-40;
-  ctx.font=MF;
-  var maxL=Math.max(2,Math.floor((avail-vBox-gap-sigH)/ML));
-  var ml=clampLines(ctx,wrapText(ctx,content.msg,tw),Math.min(maxL,8));
-  var total=vBox+gap+ml.length*ML+sigH;
-  y+=40+Math.max(0,Math.floor((avail-total)/2));
-  if(vBox){
-    roundRect(ctx,x,y,tw,vBox,20); ctx.fillStyle='rgba(184,149,42,.12)'; ctx.fill();
-    ctx.fillStyle=GOLD; ctx.fillRect(x,y,6,vBox);
-    ctx.fillStyle=INK; ctx.font=VF;
-    vl.forEach(function(l,i){ ctx.fillText(l, x+40, y+28+i*VL); });
-    ctx.fillStyle=GOLD; ctx.font='600 34px '+F;
-    ctx.fillText(content.verse.ref, x+40, y+28+vl.length*VL+10);
-    y+=vBox+gap;
-  }
-  ctx.fillStyle='#4A3F2E'; ctx.font=MF;
-  ml.forEach(function(l,i){ ctx.fillText(l, x, y+i*ML); });
-  y+=ml.length*ML+20;
-  ctx.fillStyle=GOLD; ctx.font='600 36px '+F; ctx.textAlign='right';
-  ctx.fillText('— '+c.name, x+tw, y);
-  ctx.textAlign='left';
-  // 하단 안내
-  var fy=cy+ch+30;
-  ctx.fillStyle=GOLDL; ctx.font='700 34px '+F; ctx.fillText('✦ 성경 인물 AI 멘토', P+8, fy);
-  ctx.fillStyle='#C9B98F'; ctx.font='400 28px '+F; ctx.textAlign='right';
-  ctx.fillText('bible.cheonha.app', W-P-8, fy+4); ctx.textAlign='left';
-  return await new Promise(function(r){ cv.toBlob(r,'image/png'); });
-}
-async function openShareCard(){
-  var last=null;
-  for(var i=messages.length-1;i>=0;i--){ if(messages[i].role==='assistant'){ last=messages[i].content; break; } }
-  if(!last){ showToast('공유할 답변이 없습니다.'); return; }
-  var c=CHARS[currentChar]; if(!c) return;
-  try{
-    shareBlob=await drawShareCard(c, pickCardContent(last));
-    if(!shareBlob) throw new Error('no blob');
-  }catch(e){ showToast('카드를 만들지 못했습니다. 다시 시도해 주세요.'); return; }
-  var img=document.getElementById('shareImg');
-  if(img.dataset.url) URL.revokeObjectURL(img.dataset.url);
-  img.dataset.url=URL.createObjectURL(shareBlob); img.src=img.dataset.url;
-  var file=new File([shareBlob],'bible-card.png',{type:'image/png'});
-  var canShare=!!(navigator.canShare && navigator.canShare({files:[file]}));
-  document.getElementById('shareSendBtn').style.display=canShare?'':'none';
-  document.getElementById('shareModal').style.display='flex';
-}
-function closeShareCard(){ document.getElementById('shareModal').style.display='none'; }
-async function sendShareCard(){
-  if(!shareBlob) return;
-  var file=new File([shareBlob],'bible-card.png',{type:'image/png'});
-  try{
-    await navigator.share({files:[file], text:'성경 인물에게 직접 물어보세요 '+SHARE_URL});
-    closeShareCard();
-  }catch(e){
-    if(e && e.name==='AbortError') return; // 사용자가 공유 창을 닫음
-    downloadShareCard();
-  }
-}
-function downloadShareCard(){
-  if(!shareBlob) return;
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(shareBlob); a.download='성경인물AI멘토_말씀카드.png';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
-  try{ navigator.clipboard && navigator.clipboard.writeText(SHARE_URL); }catch(e){}
-  showToast('이미지를 저장했어요. 주소도 복사해 두었어요.');
 }
 
 function deleteRecord(id, e){
@@ -1875,71 +1446,65 @@ function formatReply(text){
   return mainHtml;
 }
 function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}}
-// 진행 중이던 대화 요청 표시를 정리 (인물 변경·처음으로 이동 시)
-function resetLoading(){
-  isLoading=false;
-  var sb=document.getElementById('sendBtn'); if(sb) sb.disabled=false;
-  removeTyping();
-}
 async function sendMsg(){
   if(isLoading)return;
-  const myConv=convId; // 이 질문을 보낸 대화
   const input=document.getElementById('msgInput');
   const text=input.value.trim(); if(!text)return;
 
-  input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
-  isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
-
-  // 횟수가 막혔을 때: 방금 보낸 말은 화면·기록에서 되돌리고 입력창에 복원
-  function undoLastUserMsg(){
-    removeTyping();
-    messages.pop();
-    var ca=document.getElementById('chatArea');
-    var last=ca.lastElementChild;
-    if(last && last.classList.contains('msg-user')) last.remove();
-    input.value=text;
-  }
-
-  try{
-    // 남은 횟수 확인과 차감은 서버(/api/chat)에서 처리
-    const res=await fetch('/api/chat',{
-      method:'POST',
-      headers:authHeaders({'Content-Type':'application/json'}),
-      body:JSON.stringify({system:CHARS[currentChar].system,messages:messages})
-    });
-    const data=await res.json().catch(()=>({}));
-    // 답이 오는 사이 인물을 바꾸거나 처음으로 갔으면 늦게 온 답은 버림
-    if(myConv!==convId) return;
-
-    if(res.status===401){ undoLastUserMsg(); handleSessionExpired(); return; }
-    if(res.status===402){
-      undoLastUserMsg();
-      if(data.usage) renderUsage(data.usage);
-      if(data.code==='GUEST_LIMIT') document.getElementById('loginPromptModal').style.display='flex';
-      else if(data.code==='DAILY_CAP') showLimitModal(data.usage && data.usage.tier, 'cap');
-      else if(data.code==='DAILY_LIMIT') showNotice('오늘 대화 '+(data.usage?data.usage.limit:30)+'회를 모두 사용하셨어요.<br>자정(한국시간) 이후 다시 이어서 대화하실 수 있어요 🙏');
-      else showLimitModal(data.usage && data.usage.tier);
+  // 비로그인이면 게스트 3회 체크 먼저
+  if(!window._currentUser){
+    input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
+    isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+    if(!window._checkGuestLimit()){
+      removeTyping();
+      isLoading=false; document.getElementById('sendBtn').disabled=false;
       return;
     }
-    if(!res.ok) throw new Error(data.error||('API 오류 '+res.status));
-
-    const reply=((data.content||[]).find(b=>b&&b.type==='text')||{}).text||'응답을 받지 못했습니다.';
+  } else {
+    // 로그인 후 무료 3회 제한 체크 (관리자는 무제한)
+    var LIMIT=3;
+    var isAdmin=localStorage.getItem('bca_admin')==='true'||window._currentUser.email==='onsign@gmail.com';
+    if(!isAdmin){
+      var usageKey='bca_usage_'+getMonthKey();
+      var usage=parseInt(localStorage.getItem(usageKey)||'0');
+      if(usage>=LIMIT){
+        showLimitModal();
+        return;
+      }
+    }
+    input.value=''; addUserMsg(text); messages.push({role:'user',content:text});
+    isLoading=true; document.getElementById('sendBtn').disabled=true; addTyping();
+  }
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:CHARS[currentChar].system,messages:messages})
+    });
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error?.message||'API 오류 '+res.status);}
+    const data=await res.json();
+    const reply=data.content?.[0]?.text||'응답을 받지 못했습니다.';
     messages.push({role:'assistant',content:reply});
     removeTyping(); addAiMsg(formatReply(reply));
     enterAnswerMode();
-    if(data.usage) renderUsage(data.usage);
+    // 사용량 증가 (관리자는 스킵)
+    var isAdm=localStorage.getItem('bca_admin')==='true';
+    if(!isAdm){
+      var uk='bca_usage_'+getMonthKey();
+      var u=parseInt(localStorage.getItem(uk)||'0')+1;
+      localStorage.setItem(uk,u);
+      updateUsageDisplay(u);
+    } else {
+      updateUsageDisplay(-1);
+    }
   }catch(err){
-    if(myConv!==convId) return;
     removeTyping();
     const errDiv=document.createElement('div'); errDiv.className='msg msg-ai';
     errDiv.innerHTML='<div class="avatar">⚠️</div><div class="bubble"><div class="error-msg">오류: '+err.message+'</div></div>';
     document.getElementById('chatArea').appendChild(errDiv);
     document.getElementById('chatArea').scrollTop=99999; messages.pop();
-  }finally{
-    if(myConv===convId){
-      isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
-    }
   }
+  isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
 }
 // 앱 시작
 document.addEventListener('DOMContentLoaded', function() { startApp(); });
@@ -1956,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', function() { startApp(); });
     <a href="/privacy.html" style="color:#8a7a60;text-decoration:none;margin:0 8px;">개인정보처리방침</a>
     <a href="/refund.html" style="color:#8a7a60;text-decoration:none;margin:0 8px;">환불정책</a>
   </div>
-  <div style="margin-top:4px;">© 2026 성경 인물 AI 멘토 (BibleCharacter.AI). All rights reserved.</div>
+  <div style="margin-top:4px;">© 2026 BibleCharacter.AI. All rights reserved.</div>
 </div>
 
 <!-- 웰컴 모달 -->
